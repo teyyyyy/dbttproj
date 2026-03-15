@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Your Orders{% endblock %}
+
+{% block content %}
+<h1>Your Orders</h1>
+
+{% if orders %}
+<div class="row">
+    {% for order in orders %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Order #{{ order.id }}</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Status:</strong> {{ order.status }}</p>
+                <p><strong>Total:</strong> ${{ "%.2f"|format(order.total_amount) }}</p>
+                <p><strong>Time:</strong> {{ order.order_time }}</p>
+                <p><strong>Address:</strong> {{ order.delivery_address }}</p>
+                <h6>Items:</h6>
+                <ul>
+                    {% for item in order.items %}
+                    <li>{{ item.quantity }} x {{ item.menu_item.name }} @ ${{ "%.2f"|format(item.price) }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p>You have no orders yet.</p>
+{% endif %}
+
+<div class="mt-3">
+    <a href="/cafes" class="btn btn-primary">Order More</a>
+</div>
+{% endblock %}

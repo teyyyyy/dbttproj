@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+{% if current_user.role == 'vendor' %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>Home Base F&B Dashboard</h2>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Today's Orders</h5>
+            </div>
+            <div class="card-body">
+                <p>{{ todays_orders }} orders today</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Weekly Revenue</h5>
+            </div>
+            <div class="card-body">
+                <p>${{ "%.2f"|format(weekly_revenue) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Popular Items Today</h5>
+            </div>
+            <div class="card-body">
+                {% for item, count in popular_items_today.items() %}
+                <p>{{ item }}: {{ count }} sold</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>CRM - Customer Database</h5>
+            </div>
+            <div class="card-body">
+                <p>Build and manage your customer database.</p>
+                <ul>
+                    {% for customer in customers %}
+                    <li>{{ customer.full_name }} ({{ customer.email }}) - Orders: {{ customer.order_count }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Order Management</h5>
+            </div>
+            <div class="card-body">
+                <p>Manage orders in one place.</p>
+                {% for cafe in cafes %}
+                <p><a href="/cafes/{{ cafe.id }}/edit">Edit Menu for {{ cafe.name }}</a></p>
+                {% endfor %}
+                <p>Paid Marketing: Placeholder for marketing functions.</p>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Analytics</h5>
+            </div>
+            <div class="card-body">
+                <p>Best Selling Items: {% for item, count in popular_items.items() %}{{ item }} ({{ count }}), {% endfor %}</p>
+                <p>Weekly Sales Trends: Revenue this week: ${{ "%.2f"|format(weekly_revenue) }}</p>
+                <p>Customer Purchase Patterns: Placeholder for demand prediction.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Stall Info</h5>
+            </div>
+            <div class="card-body">
+                {% for cafe in cafes %}
+                <p><strong>{{ cafe.name }}</strong></p>
+                <p>{{ cafe.description }}</p>
+                <p>Address: {{ cafe.address }}</p>
+                <p>Hours: {{ cafe.operating_hours }}</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Production Planning</h5>
+            </div>
+            <div class="card-body">
+                <p>Plan production quantities to reduce food wastage.</p>
+                <p>Based on analytics, suggest quantities for popular items.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% elif current_user.role == 'customer' %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Your Orders</h5>
+            </div>
+            <div class="card-body">
+                {% for order in orders %}
+                <p>Order #{{ order.id }} - {{ order.status }} - ${{ "%.2f"|format(order.total_amount) }}</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Loyalty Points</h5>
+            </div>
+            <div class="card-body">
+                <h3>{{ points_balance }} Points</h3>
+                <p>Earn points with every purchase!</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

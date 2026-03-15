@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Menu - {{ cafe.name }}{% endblock %}
+
+{% block content %}
+<h1>Edit Menu for {{ cafe.name }}</h1>
+
+<div class="mb-3">
+    <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+
+<h2>Current Menu Items</h2>
+<div class="row">
+    {% for item in menu_items %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ item.name }}</h5>
+                <p class="card-text">{{ item.description }}</p>
+                <p class="card-text"><strong>${{ "%.2f"|format(item.price) }}</strong></p>
+                <button class="btn btn-warning btn-sm edit-item" data-id="{{ item.id }}" data-name="{{ item.name }}" data-description="{{ item.description }}" data-price="{{ item.price }}">Edit</button>
+                <button class="btn btn-danger btn-sm delete-item" data-id="{{ item.id }}">Delete</button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<h2>Add New Item</h2>
+<form id="add-item-form">
+    <div class="mb-3">
+        <label for="name" class="form-label">Name</label>
+        <input type="text" class="form-control" id="name" required>
+    </div>
+    <div class="mb-3">
+        <label for="description" class="form-label">Description</label>
+        <textarea class="form-control" id="description" required></textarea>
+    </div>
+    <div class="mb-3">
+        <label for="price" class="form-label">Price</label>
+        <input type="number" step="0.01" class="form-control" id="price" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Item</button>
+</form>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-item-form">
+                    <input type="hidden" id="edit-id">
+                    <div class="mb-3">
+                        <label for="edit-name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="edit-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-description" class="form-label">Description</label>
+                        <textarea class="form-control" id="edit-description" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-price" class="form-label">Price</label>
+                        <input type="number" step="0.01" class="form-control" id="edit-price" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Item</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('add-item-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Simulate adding item
+    alert('Item added! (This is a demo)');
+});
+
+document.querySelectorAll('.edit-item').forEach(button => {
+    button.addEventListener('click', function() {
+        const id = this.dataset.id;
+        const name = this.dataset.name;
+        const description = this.dataset.description;
+        const price = this.dataset.price;
+        document.getElementById('edit-id').value = id;
+        document.getElementById('edit-name').value = name;
+        document.getElementById('edit-description').value = description;
+        document.getElementById('edit-price').value = price;
+        new bootstrap.Modal(document.getElementById('editModal')).show();
+    });
+});
+
+document.getElementById('edit-item-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    // Simulate updating item
+    alert('Item updated! (This is a demo)');
+    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+});
+
+document.querySelectorAll('.delete-item').forEach(button => {
+    button.addEventListener('click', function() {
+        if (confirm('Delete this item?')) {
+            // Simulate deleting
+            alert('Item deleted! (This is a demo)');
+        }
+    });
+});
+</script>
+{% endblock %}

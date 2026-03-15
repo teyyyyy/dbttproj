@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3>Login</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>Demo Credentials:</strong></p>
+                <p>Customer: customer@gmail.com / customer</p>
+                <p>Vendor: vendor@gmail.com / vendor</p>
+                <form id="login-form">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <p class="mt-3">Don't have an account? <a href="/register">Register here</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('login-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    // Demo login
+    if (username === "customer@gmail.com" || username === "vendor@gmail.com") {
+        const role = username === "customer@gmail.com" ? "customer" : "vendor";
+        document.cookie = `role=${role}; path=/; max-age=3600`;  // 1 hour
+        const redirectUrl = role === "vendor" ? "/dashboard" : "/";
+        window.location.href = redirectUrl;
+    } else {
+        alert('Invalid credentials');
+    }
+});
+</script>
+{% endblock %}

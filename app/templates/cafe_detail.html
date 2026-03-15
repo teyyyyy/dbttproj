@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}{{ cafe.name }} - Café Discovery{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h1>{{ cafe.name }}</h1>
+        <p>{{ cafe.description }}</p>
+        <p><strong>Address:</strong> {{ cafe.address }}</p>
+        <p><strong>Operating Hours:</strong> {{ cafe.operating_hours }}</p>
+        <div class="mb-3">
+            <h5>Location Map</h5>
+            <img src="https://via.placeholder.com/400x300/cccccc/000000?text=Map+of+{{ cafe.name | urlencode }}" alt="Map" class="img-fluid">
+        </div>
+
+        <h2>Menu</h2>
+        <div class="row">
+            {% for item in menu_items %}
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ item.name }}</h5>
+                        <p class="card-text">{{ item.description }}</p>
+                        <p class="card-text"><strong>${{ "%.2f"|format(item.price) }}</strong></p>
+                        {% if current_user and current_user.role == 'customer' %}
+                        <button class="btn btn-success add-to-cart" data-item-id="{{ item.id }}">Add to Cart</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="col-md-4">
+        {% if current_user and current_user.role == 'customer' %}
+        <div class="card">
+            <div class="card-header">
+                <h5>Your Cart</h5>
+            </div>
+            <div class="card-body">
+                <div id="cart-items"></div>
+                <button class="btn btn-primary" id="place-order">Place Order</button>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>Reviews</h5>
+            </div>
+            <div class="card-body">
+                {% for review in reviews %}
+                <div class="mb-3">
+                    <strong>{{ review.user.full_name }}</strong> - {{ review.rating }}/5
+                    <p>{{ review.comment }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var cafeId = {{ cafe.id }};
+let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+
+document.querySelectorAll('.add-to-cart').forEach(button => {
+    button.addEventListener('click', function() {
+        const itemId = this.dataset.itemId;
+        const itemName = this.previousElementSibling.previousElementSibling.textContent;
+        const itemPrice = parseFloat(this.previousElementSibling.textContent.replace('$', ''));
+        
+        cart.push({id: itemId, name: itemName, price: itemPrice, quantity: 1});
+        updateCart();
+    });
+});
+
+function updateCart() {
+    const cartDiv = document.getElementById('cart-items');
+    cartDiv.innerHTML = '';
+    let total = 0;
+    cart.forEach((item, index) => {
+        total += item.price * item.quantity;
+        cartDiv.innerHTML += `<p>${item.name} x${item.quantity} - $${(item.price * item.quantity).toFixed(2)} <button class="btn btn-sm btn-danger" onclick="removeFromCart(${index})">Remove</button></p>`;
+    });
+    cartDiv.innerHTML += `<p><strong>Total: $${total.toFixed(2)}</strong></p>`;
+    localStorage.setItem('cart', JSON.stringify(cart));
+}
+
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    updateCart();
+}
+
+document.getElementById('place-order').addEventListener('click', function() {
+    if (cart.length === 0) {
+        alert('Cart is empty!');
+        return;
+    }
+    // Simulate payment
+    alert('Simulating payment... Please enter payment details.');
+    // For demo, assume payment success
+    fetch('/checkout', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({cafe_id: cafeId, items: cart.map(item => ({id: parseInt(item.id), quantity: item.quantity})), delivery_address: 'Default Address'})
+    }).then(response => response.json()).then(data => {
+        alert('Order placed!');
+        cart = [];
+        localStorage.setItem('cart', JSON.stringify(cart));
+        updateCart();
+        window.location.href = '/orders';
+    }).catch(err => {
+        alert('Error placing order');
+        console.error(err);
+    });
+});
+</script>
+{% endblock %}

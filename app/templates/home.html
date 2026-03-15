@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Café Discovery{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Welcome to Café Discovery</h1>
+        <p>Discover amazing home-based cafés near you. Order delicious food and earn loyalty points!</p>
+        
+        <div class="mb-4">
+            <form class="d-flex" method="get" action="/cafes">
+                <input class="form-control me-2" type="search" name="search" placeholder="Search cafés..." aria-label="Search">
+                <button class="btn btn-outline-success" type="submit">Search</button>
+            </form>
+        </div>
+
+        <h2>Featured Cafés</h2>
+        <div class="row">
+            {% for cafe in cafes %}
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ cafe.name }}</h5>
+                        <p class="card-text">{{ cafe.description }}</p>
+                        <p class="card-text"><small class="text-muted">{{ cafe.address }}</small></p>
+                        <a href="/cafes/{{ cafe.id }}?role={{ current_user.role }}" class="btn btn-primary">View Menu</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
