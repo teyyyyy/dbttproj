@@ -15,22 +15,37 @@
         </div>
 
         <h2>Menu</h2>
-        <div class="row">
-            {% for item in menu_items %}
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ item.name }}</h5>
-                        <p class="card-text">{{ item.description }}</p>
-                        <p class="card-text"><strong>${{ "%.2f"|format(item.price) }}</strong></p>
-                        {% if current_user and current_user.role == 'customer' %}
-                        <button class="btn btn-success add-to-cart" data-item-id="{{ item.id }}">Add to Cart</button>
-                        {% endif %}
+        {% for category, items in grouped_menu_items.items() %}
+        <div class="menu-category">
+            <div class="menu-category__header">
+                <h4>{{ category }}</h4>
+                <span>{{ items|length }} item{% if items|length != 1 %}s{% endif %}</span>
+            </div>
+            <div class="row">
+                {% for item in items %}
+                <div class="col-md-6">
+                    <div class="card menu-item-card">
+                        <div class="card-body">
+                            <div class="menu-item-card__top">
+                                <h5 class="card-title">{{ item.name }}</h5>
+                                {% if item.is_available %}
+                                <span class="availability-badge availability-badge--live">Available</span>
+                                {% else %}
+                                <span class="availability-badge availability-badge--off">Unavailable</span>
+                                {% endif %}
+                            </div>
+                            <p class="card-text">{{ item.description }}</p>
+                            <p class="card-text"><strong>${{ "%.2f"|format(item.price) }}</strong></p>
+                            {% if current_user and current_user.role == 'customer' and item.is_available %}
+                            <button class="btn btn-success add-to-cart" data-item-id="{{ item.id }}">Add to Cart</button>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
+        {% endfor %}
     </div>
     <div class="col-md-4">
         {% if current_user and current_user.role == 'customer' %}

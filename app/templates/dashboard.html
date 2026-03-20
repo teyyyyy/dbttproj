@@ -3,121 +3,291 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<h1>Dashboard</h1>
-
 {% if current_user.role == 'vendor' %}
-<div class="row">
-    <div class="col-md-12">
-        <h2>Home Base F&B Dashboard</h2>
-    </div>
-</div>
-<div class="row">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Today's Orders</h5>
+<section class="vendor-hero">
+    <div class="vendor-hero__content">
+        <p class="eyebrow">Business workspace</p>
+        <h1>Centralised CRM and operations dashboard for home-based F&B vendors</h1>
+        <p class="vendor-hero__lead">
+            Track customer relationships, monitor menu performance, and turn recent orders into better production and inventory decisions.
+        </p>
+        <div class="vendor-hero__stats">
+            <div class="hero-stat">
+                <span class="hero-stat__value">{{ active_cafes }}</span>
+                <span class="hero-stat__label">Active stalls</span>
             </div>
-            <div class="card-body">
-                <p>{{ todays_orders }} orders today</p>
+            <div class="hero-stat">
+                <span class="hero-stat__value">{{ total_orders }}</span>
+                <span class="hero-stat__label">Total orders</span>
             </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Weekly Revenue</h5>
-            </div>
-            <div class="card-body">
-                <p>${{ "%.2f"|format(weekly_revenue) }}</p>
+            <div class="hero-stat">
+                <span class="hero-stat__value">${{ "%.2f"|format(average_order_value) }}</span>
+                <span class="hero-stat__label">Average basket</span>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5>Popular Items Today</h5>
-            </div>
-            <div class="card-body">
-                {% for item, count in popular_items_today.items() %}
-                <p>{{ item }}: {{ count }} sold</p>
-                {% endfor %}
+    <div class="vendor-hero__panel">
+        <p class="panel-label">Why this page exists</p>
+        <p class="panel-copy">
+            To develop a centralised CRM and digital operations platform that helps emerging home-based F&amp;B businesses manage customer relationships, analyse menu performance, and improve order and inventory planning.
+        </p>
+    </div>
+</section>
+
+<section class="dashboard-grid">
+    <article class="dashboard-card metric-card">
+        <p class="metric-card__label">Orders today</p>
+        <h2>{{ todays_orders }}</h2>
+        <p class="metric-card__note">Live count of today's incoming business.</p>
+    </article>
+    <article class="dashboard-card metric-card">
+        <p class="metric-card__label">Weekly revenue</p>
+        <h2>${{ "%.2f"|format(weekly_revenue) }}</h2>
+        <p class="metric-card__note">Revenue generated in the last 7 days.</p>
+    </article>
+    <article class="dashboard-card metric-card">
+        <p class="metric-card__label">Customers reached</p>
+        <h2>{{ customers|length }}</h2>
+        <p class="metric-card__note">Unique recent customers identified for CRM follow-up.</p>
+    </article>
+    <article class="dashboard-card metric-card">
+        <p class="metric-card__label">Bookings via platform</p>
+        <h2>{{ platform_bookings }}</h2>
+        <p class="metric-card__note">{{ booking_completion_rate }}% completed or ready in the last 7 days.</p>
+    </article>
+</section>
+
+<section class="dashboard-grid dashboard-grid--split">
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">CRM</p>
+                <h3>Customer relationships</h3>
             </div>
         </div>
-    </div>
-</div>
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>CRM - Customer Database</h5>
+        {% if customers %}
+        <div class="list-stack">
+            {% for customer in customers %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ customer.full_name }}</strong>
+                    <p>{{ customer.email }}</p>
+                </div>
+                <div class="list-row__meta">
+                    <span>{{ customer.order_count }} orders</span>
+                    <span>${{ "%.2f"|format(customer.total_spent) }} spent</span>
+                </div>
             </div>
-            <div class="card-body">
-                <p>Build and manage your customer database.</p>
-                <ul>
-                    {% for customer in customers %}
-                    <li>{{ customer.full_name }} ({{ customer.email }}) - Orders: {{ customer.order_count }}</li>
-                    {% endfor %}
-                </ul>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">Customer profiles will appear here as soon as orders start coming in.</p>
+        {% endif %}
+    </article>
+
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Operations</p>
+                <h3>Fulfilment overview</h3>
             </div>
         </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Order Management</h5>
+        <div class="status-grid">
+            <div class="status-pill">
+                <span class="status-pill__count">{{ status_counts.get('pending', 0) }}</span>
+                <span class="status-pill__label">Pending</span>
             </div>
-            <div class="card-body">
-                <p>Manage orders in one place.</p>
-                {% for cafe in cafes %}
-                <p><a href="/cafes/{{ cafe.id }}/edit">Edit Menu for {{ cafe.name }}</a></p>
-                {% endfor %}
-                <p>Paid Marketing: Placeholder for marketing functions.</p>
+            <div class="status-pill">
+                <span class="status-pill__count">{{ status_counts.get('confirmed', 0) }}</span>
+                <span class="status-pill__label">Confirmed</span>
             </div>
-        </div>
-    </div>
-</div>
-<div class="row mt-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Analytics</h5>
+            <div class="status-pill">
+                <span class="status-pill__count">{{ status_counts.get('preparing', 0) }}</span>
+                <span class="status-pill__label">Preparing</span>
             </div>
-            <div class="card-body">
-                <p>Best Selling Items: {% for item, count in popular_items.items() %}{{ item }} ({{ count }}), {% endfor %}</p>
-                <p>Weekly Sales Trends: Revenue this week: ${{ "%.2f"|format(weekly_revenue) }}</p>
-                <p>Customer Purchase Patterns: Placeholder for demand prediction.</p>
+            <div class="status-pill">
+                <span class="status-pill__count">{{ status_counts.get('ready', 0) + status_counts.get('delivered', 0) }}</span>
+                <span class="status-pill__label">Ready / done</span>
             </div>
         </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Stall Info</h5>
-            </div>
-            <div class="card-body">
-                {% for cafe in cafes %}
-                <p><strong>{{ cafe.name }}</strong></p>
-                <p>{{ cafe.description }}</p>
-                <p>Address: {{ cafe.address }}</p>
-                <p>Hours: {{ cafe.operating_hours }}</p>
-                {% endfor %}
+        <div class="link-stack">
+            {% for cafe in cafes %}
+            <a href="/cafes/{{ cafe.id }}/edit" class="action-link">Manage menu for {{ cafe.name }}</a>
+            {% endfor %}
+            <a href="/orders" class="action-link">Open full vendor order list</a>
+        </div>
+    </article>
+</section>
+
+<section class="dashboard-grid dashboard-grid--split">
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Menu analytics</p>
+                <h3>Best-performing items</h3>
             </div>
         </div>
-    </div>
-</div>
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5>Production Planning</h5>
+        {% if top_menu_items %}
+        <div class="list-stack">
+            {% for item in top_menu_items %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ item.name }}</strong>
+                    <p>{{ item.category|capitalize }}{% if item.cafes %} • {{ item.cafes }}{% endif %}</p>
+                </div>
+                <div class="list-row__meta">
+                    <span>{{ item.quantity_sold }} sold</span>
+                    <span>${{ "%.2f"|format(item.revenue) }}</span>
+                </div>
             </div>
-            <div class="card-body">
-                <p>Plan production quantities to reduce food wastage.</p>
-                <p>Based on analytics, suggest quantities for popular items.</p>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">Once orders are placed, this section will highlight your best-selling menu items.</p>
+        {% endif %}
+    </article>
+
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Sales trend</p>
+                <h3>Last 7 days</h3>
             </div>
         </div>
+        <div class="mini-chart">
+            {% for day in weekly_sales_data %}
+            <div class="mini-chart__day">
+                <div class="mini-chart__bar-wrap">
+                    <div class="mini-chart__bar" style="height: {{ 18 if day.revenue == 0 else (day.revenue / (weekly_revenue if weekly_revenue else 1) * 140 + 18) | round(0, 'ceil') }}px;"></div>
+                </div>
+                <strong>${{ "%.0f"|format(day.revenue) }}</strong>
+                <span>{{ day.label }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="dashboard-grid dashboard-grid--split">
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Bookings chart</p>
+                <h3>Daily platform bookings</h3>
+            </div>
+        </div>
+        <div class="booking-chart">
+            {% for day in weekly_booking_data %}
+            <div class="booking-chart__day">
+                <div class="booking-chart__bar-wrap">
+                    <div class="booking-chart__bar" style="height: {{ 18 if day.count == 0 else (day.count / (platform_bookings if platform_bookings else 1) * 180 + 18) | round(0, 'ceil') }}px;"></div>
+                </div>
+                <strong>{{ day.count }}</strong>
+                <span>{{ day.label }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Category mix</p>
+                <h3>What customers are buying</h3>
+            </div>
+        </div>
+        {% if category_sales_data %}
+        <div class="category-chart">
+            {% for category in category_sales_data %}
+            <div class="category-chart__row">
+                <div class="category-chart__label">
+                    <strong>{{ category.label }}</strong>
+                    <span>{{ category.quantity }} items</span>
+                </div>
+                <div class="category-chart__track">
+                    <div class="category-chart__fill" style="width: {{ (category.quantity / category_sales_data[0].quantity * 100) | round(0, 'ceil') if category_sales_data[0].quantity else 0 }}%;"></div>
+                </div>
+                <strong class="category-chart__value">${{ "%.2f"|format(category.revenue) }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">Category performance will populate after more orders are placed.</p>
+        {% endif %}
+    </article>
+</section>
+
+<section class="dashboard-grid dashboard-grid--split">
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Production planning</p>
+                <h3>Suggested prep quantities</h3>
+            </div>
+        </div>
+        {% if demand_forecast %}
+        <div class="list-stack">
+            {% for item in demand_forecast %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ item.name }}</strong>
+                    <p>{{ item.weekly_units }} units sold over the last 7 days</p>
+                </div>
+                <div class="list-row__meta">
+                    <span>Prep next cycle</span>
+                    <span>{{ item.suggested_qty }} portions</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">Forecast suggestions will appear once recent sales patterns exist.</p>
+        {% endif %}
+    </article>
+
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Vendor notes</p>
+                <h3>Business insights</h3>
+            </div>
+        </div>
+        <div class="insight-list">
+            {% for insight in insights %}
+            <p>{{ insight }}</p>
+            {% endfor %}
+        </div>
+        {% if low_stock_items %}
+        <div class="alert-strip">
+            Review unavailable items:
+            {% for item in low_stock_items %}
+            <span>{{ item.name }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </article>
+</section>
+
+<section class="dashboard-card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Stall directory</p>
+            <h3>Your business locations</h3>
+        </div>
     </div>
-</div>
+    <div class="stall-grid">
+        {% for cafe in cafes %}
+        <article class="stall-card">
+            <h4>{{ cafe.name }}</h4>
+            <p>{{ cafe.description }}</p>
+            <div class="stall-card__meta">
+                <span>{{ cafe.address }}</span>
+                <span>{{ cafe.operating_hours }}</span>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
 {% elif current_user.role == 'customer' %}
 <div class="row">
     <div class="col-md-6">

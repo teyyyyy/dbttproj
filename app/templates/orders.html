@@ -1,9 +1,79 @@
 {% extends "base.html" %}
 
-{% block title %}Your Orders{% endblock %}
+{% block title %}{% if current_user.role == 'vendor' %}Vendor Orders{% else %}Your Orders{% endif %}{% endblock %}
 
 {% block content %}
-<h1>Your Orders</h1>
+<h1>{% if current_user.role == 'vendor' %}Vendor Orders{% else %}Your Orders{% endif %}</h1>
+{% if current_user.role == 'vendor' %}
+<p class="text-muted">Monitor incoming orders across your stalls and review each basket in one place.</p>
+{% if order_analytics.total_orders %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Total orders</p>
+                <h3 class="mb-0">{{ order_analytics.total_orders }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Revenue</p>
+                <h3 class="mb-0">${{ "%.2f"|format(order_analytics.total_revenue) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Average order</p>
+                <h3 class="mb-0">${{ "%.2f"|format(order_analytics.average_order_value) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted mb-1">Completion rate</p>
+                <h3 class="mb-0">{{ order_analytics.completion_rate }}%</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Order status breakdown</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Pending:</strong> {{ order_analytics.status_counts.get('pending', 0) }}</p>
+                <p><strong>Confirmed:</strong> {{ order_analytics.status_counts.get('confirmed', 0) }}</p>
+                <p><strong>Preparing:</strong> {{ order_analytics.status_counts.get('preparing', 0) }}</p>
+                <p><strong>Ready / Delivered:</strong> {{ order_analytics.status_counts.get('ready', 0) + order_analytics.status_counts.get('delivered', 0) }}</p>
+                {% if order_analytics.top_cafe %}
+                <p class="mb-0"><strong>Top stall:</strong> {{ order_analytics.top_cafe.name }} ({{ order_analytics.top_cafe.orders }} orders)</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Top ordered items</h5>
+            </div>
+            <div class="card-body">
+                {% for item in order_analytics.top_items %}
+                <p><strong>{{ item.name }}</strong> <span class="text-muted">({{ item.quantity }} sold)</span></p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
 
 {% if orders %}
 <div class="row">
@@ -14,6 +84,10 @@
                 <h5>Order #{{ order.id }}</h5>
             </div>
             <div class="card-body">
+                {% if current_user.role == 'vendor' %}
+                <p><strong>Customer:</strong> {{ order.customer.full_name }} ({{ order.customer.email }})</p>
+                <p><strong>Stall:</strong> {{ order.cafe.name }}</p>
+                {% endif %}
                 <p><strong>Status:</strong> {{ order.status }}</p>
                 <p><strong>Total:</strong> ${{ "%.2f"|format(order.total_amount) }}</p>
                 <p><strong>Time:</strong> {{ order.order_time }}</p>
@@ -30,10 +104,14 @@
     {% endfor %}
 </div>
 {% else %}
-<p>You have no orders yet.</p>
+<p>{% if current_user.role == 'vendor' %}No customer orders have been placed for your stalls yet.{% else %}You have no orders yet.{% endif %}</p>
 {% endif %}
 
 <div class="mt-3">
+    {% if current_user.role == 'vendor' %}
+    <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
+    {% else %}
     <a href="/cafes" class="btn btn-primary">Order More</a>
+    {% endif %}
 </div>
 {% endblock %}
