@@ -14,8 +14,8 @@
 <section class="home-hero">
     <div class="home-hero__copy">
         <p class="eyebrow">Cafe discovery</p>
-        <h1>Find nearby cafes, map the neighborhood, and discover where to order next.</h1>
-        <p class="home-hero__lead">Browse the local scene, compare what each cafe is known for, and jump straight into the places that feel worth trying. Use the cafes page when you want to search the full directory.</p>
+        <h1>Find nearby cafes, spot trending menu items, and discover what people are ordering next.</h1>
+        <p class="home-hero__lead">Browse the local scene, compare what each cafe is known for, and see which drinks, desserts, and comfort-food picks are getting real traction right now.</p>
         <div class="home-hero__actions">
             <a href="/cafes" class="btn btn-primary btn-lg">Open Cafe Directory</a>
             <a href="#nearby-map" class="btn btn-outline-light btn-lg">Explore Map</a>
@@ -31,8 +31,8 @@
             <span class="home-stat__label">Users on platform</span>
         </div>
         <div class="home-stat">
-            <span class="home-stat__value">{{ recommended_cafes|length }}</span>
-            <span class="home-stat__label">Recommended picks</span>
+            <span class="home-stat__value">{{ trending_items|length }}</span>
+            <span class="home-stat__label">Trending items</span>
         </div>
     </div>
 </section>
@@ -93,21 +93,52 @@
 <section class="dashboard-card">
     <div class="section-heading">
         <div>
-            <p class="eyebrow">Recommended</p>
+            <p class="eyebrow">Trending now</p>
+            <h3>Popular items people keep ordering</h3>
+        </div>
+    </div>
+    <div class="row g-3">
+        {% for item in trending_items %}
+        <div class="col-md-4">
+            <div class="card home-trend-card">
+                <img src="{{ menu_item_image_url(item.name, item.category) }}" class="card-img-top cafe-card__image" alt="{{ item.name }}">
+                <div class="card-body">
+                    <span class="home-trend-card__tag">{{ item.trend_label }}</span>
+                    <h5 class="card-title mt-3">{{ item.name }}</h5>
+                    <p class="card-text">A standout {{ item.category }} pick that keeps showing up in recent platform orders.</p>
+                    <div class="home-trend-card__meta">
+                        <span>{{ item.quantity }} sold recently</span>
+                        <span>{{ item.category|capitalize }}</span>
+                    </div>
+                    <div class="home-trend-card__footer">
+                        <small class="text-muted">{{ item.cafes }}</small>
+                        <a href="/cafes" class="btn btn-primary mt-3">Browse Cafes</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="dashboard-card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Recommended cafes</p>
             <h3>Cafes worth checking out</h3>
         </div>
     </div>
-    <div class="row">
+    <div class="row g-3">
         {% for cafe in recommended_cafes %}
         <div class="col-md-4">
-            <div class="card home-rec-card">
+            <div class="card home-cafe-card">
                 <img src="{{ cafe_image_url(cafe.name) }}" class="card-img-top cafe-card__image" alt="{{ cafe.name }}">
                 <div class="card-body">
-                    <span class="home-rec-card__tag">Recommended</span>
+                    <span class="home-cafe-card__tag">Recommended</span>
                     <h5 class="card-title mt-3">{{ cafe.name }}</h5>
                     <p class="card-text">{{ cafe.description }}</p>
                     <p class="card-text"><small class="text-muted">{{ cafe.address }}</small></p>
-                    <div class="home-rec-card__meta">
+                    <div class="home-cafe-card__meta">
                         <span>
                             {% if cafe.average_rating %}
                             <span class="rating-stars" aria-label="{{ cafe.average_rating }} out of 5 stars">

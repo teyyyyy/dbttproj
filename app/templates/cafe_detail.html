@@ -64,7 +64,7 @@
         </div>
         {% endif %}
 
-        {% if current_user and current_user.role == 'vendor' %}
+        {% if current_user and current_user.role == 'vendor' and can_manage_cafe %}
         <div class="card {% if not reviews %}mt-3{% endif %}">
             <div class="card-header">
                 <h5>Vendor Actions</h5>

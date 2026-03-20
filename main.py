@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+from calendar import monthrange
 from datetime import datetime, timedelta
 from math import asin, cos, radians, sin, sqrt
 from typing import Optional
@@ -715,7 +716,7 @@ def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) ->
 
 def build_home_discovery_data(cafes: list[Cafe], db: Session):
     if not cafes:
-        return [], [], []
+        return [], [], [], []
 
     reference_lat = 1.2903
     reference_lon = 103.8519
@@ -783,7 +784,47 @@ def build_home_discovery_data(cafes: list[Cafe], db: Session):
         {"id": "area-everton", "kind": "area", "name": "Everton Park", "address": "Weekend brunch pocket", "lat": 1.2765, "lng": 103.8396},
     ]
 
-    return nearby_cafes, recommended_cafes, map_points + area_points
+    item_totals = defaultdict(
+        lambda: {"name": "", "category": "food", "quantity": 0, "cafes": set()}
+    )
+    cafe_lookup = {cafe.id: cafe.name for cafe in cafes}
+    cafe_ids = list(cafe_lookup.keys())
+    if cafe_ids:
+        order_items = (
+            db.query(OrderItem, Order.cafe_id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .options(joinedload(OrderItem.menu_item))
+            .filter(Order.cafe_id.in_(cafe_ids))
+            .all()
+        )
+        for order_item, order_cafe_id in order_items:
+            menu_item = order_item.menu_item
+            item_name = menu_item.name if menu_item else f"Item #{order_item.menu_item_id}"
+            item_category = menu_item.category if menu_item and menu_item.category else "food"
+            entry = item_totals[item_name]
+            entry["name"] = item_name
+            entry["category"] = item_category
+            entry["quantity"] += order_item.quantity
+            cafe_name = cafe_lookup.get(order_cafe_id)
+            if cafe_name:
+                entry["cafes"].add(cafe_name)
+
+    trending_items = []
+    trend_labels = ["Viral pick", "Crowd favorite", "Repeat order", "Popular right now"]
+    for index, item in enumerate(
+        sorted(item_totals.values(), key=lambda value: value["quantity"], reverse=True)[:4]
+    ):
+        trending_items.append(
+            {
+                "name": item["name"],
+                "category": item["category"],
+                "quantity": item["quantity"],
+                "cafes": ", ".join(sorted(item["cafes"])) if item["cafes"] else "Multiple cafes",
+                "trend_label": trend_labels[index % len(trend_labels)],
+            }
+        )
+
+    return nearby_cafes, recommended_cafes, trending_items, map_points + area_points
 
 
 def build_cafe_directory_data(cafes: list[Cafe], db: Session):
@@ -833,7 +874,7 @@ async def home(request: Request, db: Session = Depends(get_db), current_user = D
     cafes = visible_cafes
     cafe_count = len(visible_cafes)
     user_count = db.query(User).count()
-    nearby_cafes, recommended_cafes, map_points = build_home_discovery_data(cafes, db)
+    nearby_cafes, recommended_cafes, trending_items, map_points = build_home_discovery_data(cafes, db)
     return templates.TemplateResponse(
         "home.html",
         {
@@ -844,6 +885,7 @@ async def home(request: Request, db: Session = Depends(get_db), current_user = D
             "current_user": current_user,
             "nearby_cafes": nearby_cafes,
             "recommended_cafes": recommended_cafes,
+            "trending_items": trending_items,
             "map_points": map_points,
         },
     )
@@ -909,6 +951,11 @@ async def cafe_detail(request: Request, cafe_id: int, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Cafe not found")
     menu_items = db.query(MenuItem).filter(MenuItem.cafe_id == cafe_id).all()
     reviews = db.query(Review).filter(Review.cafe_id == cafe_id).all()
+    managed_cafe = None
+    can_manage_cafe = False
+    if current_user and current_user.role == "vendor":
+        managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
+        can_manage_cafe = bool(managed_cafe and managed_cafe.id == cafe.id)
     return templates.TemplateResponse(
         "cafe_detail.html",
         {
@@ -918,6 +965,8 @@ async def cafe_detail(request: Request, cafe_id: int, db: Session = Depends(get_
             "grouped_menu_items": group_menu_items(menu_items),
             "reviews": reviews,
             "current_user": current_user,
+            "managed_cafe": managed_cafe,
+            "can_manage_cafe": can_manage_cafe,
         },
     )
 
@@ -943,7 +992,17 @@ async def login_post(request: Request, username: str = Form(...), password: str 
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+async def dashboard(
+    request: Request,
+    period: str = "weekly",
+    trend_chart: str = "bar",
+    bookings_chart: str = "bar",
+    category_chart: str = "pie",
+    timing_chart: str = "histogram",
+    weekday_chart: str = "histogram",
+    current_user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     if not current_user:
         return RedirectResponse(url="/login", status_code=302)
     
@@ -968,16 +1027,53 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
 
         now = datetime.utcnow()
         today = now.date()
-        week_ago = now - timedelta(days=7)
+        allowed_periods = {"daily": 1, "weekly": 7, "monthly": monthrange(now.year, now.month)[1]}
+        selected_period = period if period in allowed_periods else "weekly"
+        period_days = allowed_periods[selected_period]
+        period_start = (
+            datetime(now.year, now.month, 1)
+            if selected_period == "monthly"
+            else now - timedelta(days=period_days)
+        )
+        period_label_map = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly"}
+        period_note_map = {
+            "daily": "last 24 hours",
+            "weekly": "last 7 days",
+            "monthly": now.strftime("%B %Y"),
+        }
+        period_label = period_label_map[selected_period]
+        period_note = period_note_map[selected_period]
+        allowed_chart_styles = {"bar", "histogram", "scatter"}
+        chart_preferences = {
+            "trend": trend_chart if trend_chart in allowed_chart_styles else "bar",
+            "bookings": bookings_chart if bookings_chart in {"bar", "histogram"} else "bar",
+            "category": category_chart if category_chart in {"bar", "pie"} else "bar",
+            "timing": timing_chart if timing_chart in {"bar", "histogram"} else "bar",
+            "weekday": weekday_chart if weekday_chart in {"bar", "histogram"} else "bar",
+        }
 
         total_orders = len(orders)
         total_revenue = sum(o.total_amount for o in orders)
         todays_orders = [o for o in orders if o.order_time and o.order_time.date() == today]
-        weekly_orders = [o for o in orders if o.order_time and o.order_time >= week_ago]
-        weekly_revenue = sum(o.total_amount for o in weekly_orders)
-        average_order_value = total_revenue / total_orders if total_orders else 0
+        period_orders = [o for o in orders if o.order_time and o.order_time >= period_start]
+        operational_period_orders = [
+            o
+            for o in period_orders
+            if not (
+                selected_period in {"weekly", "monthly"}
+                and o.status == "pending"
+                and o.order_time
+                and o.order_time.date() < today
+            )
+        ]
+        period_revenue = sum(o.total_amount for o in period_orders)
+        average_order_value = (
+            period_revenue / len(period_orders)
+            if period_orders
+            else (total_revenue / total_orders if total_orders else 0)
+        )
 
-        status_counts = Counter(order.status for order in orders)
+        status_counts = Counter(order.status for order in operational_period_orders)
         low_stock_items = [item for item in menu_items if item.is_available is False][:5]
 
         item_performance = defaultdict(
@@ -1002,27 +1098,30 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
             for index, label in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
         }
 
-        for offset in range(6, -1, -1):
-            day = (now - timedelta(days=offset)).date()
+        for offset in range(period_days):
+            day = (
+                (period_start + timedelta(days=offset)).date()
+                if selected_period == "monthly"
+                else (now - timedelta(days=period_days - 1 - offset)).date()
+            )
             daily_revenue_map[day.isoformat()] = {
-                "label": day.strftime("%a"),
+                "label": str(day.day) if selected_period == "monthly" else day.strftime("%a"),
                 "revenue": 0.0,
             }
             daily_booking_map[day.isoformat()] = {
-                "label": day.strftime("%a"),
+                "label": str(day.day) if selected_period == "monthly" else day.strftime("%a"),
                 "count": 0,
             }
 
-        for order in orders:
-            if order.order_time and order.order_time >= week_ago:
-                day_key = order.order_time.date().isoformat()
-                if day_key in daily_revenue_map:
-                    daily_revenue_map[day_key]["revenue"] += order.total_amount
-                    daily_booking_map[day_key]["count"] += 1
-                order_hour_bucket = order.order_time.hour - (order.order_time.hour % 2)
-                if order_hour_bucket in hourly_order_map:
-                    hourly_order_map[order_hour_bucket]["count"] += 1
-                weekday_revenue_map[order.order_time.weekday()]["revenue"] += order.total_amount
+        for order in period_orders:
+            day_key = order.order_time.date().isoformat()
+            if day_key in daily_revenue_map:
+                daily_revenue_map[day_key]["revenue"] += order.total_amount
+                daily_booking_map[day_key]["count"] += 1
+            order_hour_bucket = order.order_time.hour - (order.order_time.hour % 2)
+            if order_hour_bucket in hourly_order_map:
+                hourly_order_map[order_hour_bucket]["count"] += 1
+            weekday_revenue_map[order.order_time.weekday()]["revenue"] += order.total_amount
 
             customer = order.customer
             if customer:
@@ -1095,15 +1194,15 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
             demand_forecast.append(
                 {
                     "name": item["name"],
-                    "weekly_units": item["quantity_sold"],
+                    "period_units": item["quantity_sold"],
                     "suggested_qty": suggested_qty,
                 }
             )
 
         insights = []
-        if weekly_revenue:
+        if period_revenue:
             insights.append(
-                f"Weekly revenue is ${weekly_revenue:.2f} across {len(weekly_orders)} orders, showing how much volume your current menu is generating."
+                f"{selected_period.capitalize()} revenue is ${period_revenue:.2f} across {len(period_orders)} orders, showing how much volume your current menu is generating."
             )
         if top_menu_items:
             best_item = top_menu_items[0]
@@ -1125,11 +1224,33 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
             key=lambda entry: (entry["quantity"], entry["revenue"]),
             reverse=True,
         )[:4]
-        platform_bookings = len(weekly_orders)
+        category_palette = ["#245c43", "#c66a2b", "#456f8f", "#8f5ea9"]
+        total_category_quantity = sum(entry["quantity"] for entry in category_sales_data)
+        pie_segments = []
+        pie_offset = 0.0
+        for index, entry in enumerate(category_sales_data):
+            share = round((entry["quantity"] / total_category_quantity) * 100, 2) if total_category_quantity else 0
+            entry["share"] = share
+            entry["color"] = category_palette[index % len(category_palette)]
+            pie_segments.append(f"{entry['color']} {pie_offset:.2f}% {pie_offset + share:.2f}%")
+            pie_offset += share
+        category_pie_style = f"conic-gradient({', '.join(pie_segments)})" if pie_segments else ""
+        best_sales_day = max(daily_revenue_map.values(), key=lambda entry: entry["revenue"], default=None)
+        best_booking_day = max(daily_booking_map.values(), key=lambda entry: entry["count"], default=None)
+        busiest_hour = max(hourly_order_map.values(), key=lambda entry: entry["count"], default=None)
+        best_weekday = max(weekday_revenue_map.values(), key=lambda entry: entry["revenue"], default=None)
+        monthly_overview = {
+            "average_daily_revenue": round(period_revenue / period_days, 2) if period_days else 0,
+            "best_sales_day": best_sales_day,
+            "best_booking_day": best_booking_day,
+            "busiest_hour": busiest_hour,
+            "best_weekday": best_weekday,
+        }
+        platform_bookings = len(operational_period_orders)
         booking_completion_rate = (
             round(
                 (
-                    len([order for order in weekly_orders if order.status in {"ready", "delivered"}])
+                    len([order for order in operational_period_orders if order.status in {"ready", "delivered"}])
                     / platform_bookings
                 )
                 * 100
@@ -1151,7 +1272,7 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
                 "total_revenue": total_revenue,
                 "popular_items": popular_items,
                 "todays_orders": len(todays_orders),
-                "weekly_revenue": weekly_revenue,
+                "weekly_revenue": period_revenue,
                 "platform_bookings": platform_bookings,
                 "booking_completion_rate": booking_completion_rate,
                 "popular_items_today": popular_items_today,
@@ -1169,6 +1290,13 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
                 "demand_forecast": demand_forecast,
                 "low_stock_items": low_stock_items,
                 "insights": insights,
+                "selected_period": selected_period,
+                "period_label": period_label,
+                "period_note": period_note,
+                "period_days": period_days,
+                "chart_preferences": chart_preferences,
+                "category_pie_style": category_pie_style,
+                "monthly_overview": monthly_overview,
             },
         )
     elif current_user.role == "customer":
@@ -1320,6 +1448,9 @@ async def user_orders(
 
     points_balance = db.query(func.sum(Point.amount)).filter(Point.user_id == current_user.id).scalar() or 0
     order_analytics = build_order_analytics(orders)
+    active_statuses = {"pending", "confirmed", "preparing", "ready"}
+    active_orders = [order for order in orders if order.status in active_statuses]
+    past_orders = [order for order in orders if order.status not in active_statuses]
     managed_cafe = None
     if current_user.role == "vendor":
         managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
@@ -1332,6 +1463,8 @@ async def user_orders(
             "points_balance": points_balance,
             "order_analytics": order_analytics,
             "managed_cafe": managed_cafe,
+            "active_orders": active_orders,
+            "past_orders": past_orders,
             "order_filters": {
                 "status": status,
                 "date_from": date_from,

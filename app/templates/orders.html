@@ -9,6 +9,14 @@
 
 <div class="card mb-4">
     <div class="card-body">
+        <div class="status-filter-bar">
+            <a href="/orders?sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip {% if not order_filters.status %}status-filter-chip--active{% endif %}">All</a>
+            <a href="/orders?status=pending&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--pending {% if order_filters.status == 'pending' %}status-filter-chip--active{% endif %}">Pending</a>
+            <a href="/orders?status=confirmed&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--confirmed {% if order_filters.status == 'confirmed' %}status-filter-chip--active{% endif %}">Confirmed</a>
+            <a href="/orders?status=preparing&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--preparing {% if order_filters.status == 'preparing' %}status-filter-chip--active{% endif %}">Preparing</a>
+            <a href="/orders?status=ready&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--ready {% if order_filters.status == 'ready' %}status-filter-chip--active{% endif %}">Ready</a>
+            <a href="/orders?status=delivered&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--delivered {% if order_filters.status == 'delivered' %}status-filter-chip--active{% endif %}">Delivered</a>
+        </div>
         <form method="get" action="/orders" class="row g-3 align-items-end">
             <div class="col-md-2">
                 <label for="date_from" class="form-label">From</label>
@@ -124,33 +132,89 @@
 {% endif %}
 {% endif %}
 
-{% if orders %}
-<div class="row">
-    {% for order in orders %}
+{% macro order_card(order) -%}
+<div class="col-md-6">
+    <div class="card h-100 order-card order-card--{{ order.status }}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Order #{{ order.id }}</h5>
+            <span class="badge order-status-badge order-status-badge--{{ order.status }} text-uppercase">{{ order.status }}</span>
+        </div>
+        <div class="card-body">
+            {% if current_user.role == 'vendor' %}
+            <p><strong>Customer:</strong> {{ order.customer.full_name }} ({{ order.customer.email }})</p>
+            {% endif %}
+            {% if order.status == 'pending' %}
+            <p class="order-alert">Pending orders still need confirmation before prep can begin.</p>
+            {% endif %}
+            <p><strong>Total:</strong> ${{ "%.2f"|format(order.total_amount) }}</p>
+            <p><strong>Time:</strong> {{ order.order_time }}</p>
+            <p><strong>Address:</strong> {{ order.delivery_address }}</p>
+            <h6>Items:</h6>
+            <ul>
+                {% for item in order.items %}
+                <li>{{ item.quantity }} x {{ item.menu_item.name }} @ ${{ "%.2f"|format(item.price) }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{%- endmacro %}
+
+{% if current_user.role == 'vendor' %}
+<div class="row mb-4">
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5>Order #{{ order.id }}</h5>
-            </div>
+        <div class="card h-100 border-0 shadow-sm">
             <div class="card-body">
-                {% if current_user.role == 'vendor' %}
-                <p><strong>Customer:</strong> {{ order.customer.full_name }} ({{ order.customer.email }})</p>
-                {% endif %}
-                <p><strong>Status:</strong> {{ order.status }}</p>
-                <p><strong>Total:</strong> ${{ "%.2f"|format(order.total_amount) }}</p>
-                <p><strong>Time:</strong> {{ order.order_time }}</p>
-                <p><strong>Address:</strong> {{ order.delivery_address }}</p>
-                <h6>Items:</h6>
-                <ul>
-                    {% for item in order.items %}
-                    <li>{{ item.quantity }} x {{ item.menu_item.name }} @ ${{ "%.2f"|format(item.price) }}</li>
-                    {% endfor %}
-                </ul>
+                <p class="text-muted text-uppercase small mb-2">Active queue</p>
+                <h4 class="mb-1">{{ active_orders|length }} orders need attention</h4>
+                <p class="mb-0 text-muted">Pending, confirmed, preparing, and ready orders stay grouped here so live service work is easier to spot.</p>
             </div>
         </div>
     </div>
-    {% endfor %}
+    <div class="col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <p class="text-muted text-uppercase small mb-2">Past orders</p>
+                <h4 class="mb-1">{{ past_orders|length }} completed orders</h4>
+                <p class="mb-0 text-muted">Delivered orders move into history so older fulfilments do not compete with current tasks.</p>
+            </div>
+        </div>
+    </div>
 </div>
+{% endif %}
+
+{% if orders %}
+{% if active_orders %}
+<section class="mb-4">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <div>
+            <p class="text-muted text-uppercase small mb-1">{% if current_user.role == 'vendor' %}Active orders{% else %}Current orders{% endif %}</p>
+            <h3 class="mb-0">{% if current_user.role == 'vendor' %}Orders to prepare or hand off{% else %}Orders still in progress{% endif %}</h3>
+        </div>
+    </div>
+    <div class="row g-3">
+        {% for order in active_orders %}
+        {{ order_card(order) }}
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if past_orders %}
+<section>
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <div>
+            <p class="text-muted text-uppercase small mb-1">{% if current_user.role == 'vendor' %}Past orders{% else %}Order history{% endif %}</p>
+            <h3 class="mb-0">{% if current_user.role == 'vendor' %}Completed delivery history{% else %}Completed purchases{% endif %}</h3>
+        </div>
+    </div>
+    <div class="row g-3">
+        {% for order in past_orders %}
+        {{ order_card(order) }}
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 {% else %}
 <p>{% if current_user.role == 'vendor' %}No customer orders have been placed for your cafe yet.{% else %}You have no orders yet.{% endif %}</p>
 {% endif %}
