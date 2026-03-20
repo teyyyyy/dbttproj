@@ -5,7 +5,54 @@
 {% block content %}
 <h1>{% if current_user.role == 'vendor' %}Vendor Orders{% else %}Your Orders{% endif %}</h1>
 {% if current_user.role == 'vendor' %}
-<p class="text-muted">Monitor incoming orders across your stalls and review each basket in one place.</p>
+<p class="text-muted">Monitor incoming orders for {{ managed_cafe.name if managed_cafe else 'your cafe' }} and review each basket in one place.</p>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" action="/orders" class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label for="date_from" class="form-label">From</label>
+                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ order_filters.date_from }}">
+            </div>
+            <div class="col-md-2">
+                <label for="date_to" class="form-label">To</label>
+                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ order_filters.date_to }}">
+            </div>
+            <div class="col-md-2">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All</option>
+                    <option value="pending" {% if order_filters.status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="confirmed" {% if order_filters.status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                    <option value="preparing" {% if order_filters.status == 'preparing' %}selected{% endif %}>Preparing</option>
+                    <option value="ready" {% if order_filters.status == 'ready' %}selected{% endif %}>Ready</option>
+                    <option value="delivered" {% if order_filters.status == 'delivered' %}selected{% endif %}>Delivered</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="item_search" class="form-label">Item</label>
+                <input type="text" class="form-control" id="item_search" name="item_search" placeholder="e.g. Matcha" value="{{ order_filters.item_search }}">
+            </div>
+            <div class="col-md-2">
+                <label for="customer_search" class="form-label">Customer</label>
+                <input type="text" class="form-control" id="customer_search" name="customer_search" placeholder="Name or email" value="{{ order_filters.customer_search }}">
+            </div>
+            <div class="col-md-2">
+                <label for="sort" class="form-label">Sort</label>
+                <select class="form-select" id="sort" name="sort">
+                    <option value="newest" {% if order_filters.sort == 'newest' %}selected{% endif %}>Newest</option>
+                    <option value="oldest" {% if order_filters.sort == 'oldest' %}selected{% endif %}>Oldest</option>
+                    <option value="highest" {% if order_filters.sort == 'highest' %}selected{% endif %}>Highest value</option>
+                </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                <a href="/orders" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% if order_analytics.total_orders %}
 <div class="row mb-4">
     <div class="col-md-3">
@@ -53,8 +100,10 @@
                 <p><strong>Confirmed:</strong> {{ order_analytics.status_counts.get('confirmed', 0) }}</p>
                 <p><strong>Preparing:</strong> {{ order_analytics.status_counts.get('preparing', 0) }}</p>
                 <p><strong>Ready / Delivered:</strong> {{ order_analytics.status_counts.get('ready', 0) + order_analytics.status_counts.get('delivered', 0) }}</p>
-                {% if order_analytics.top_cafe %}
-                <p class="mb-0"><strong>Top stall:</strong> {{ order_analytics.top_cafe.name }} ({{ order_analytics.top_cafe.orders }} orders)</p>
+                {% if managed_cafe %}
+                <p class="mb-0"><strong>Managed cafe:</strong> {{ managed_cafe.name }}</p>
+                {% elif order_analytics.top_cafe %}
+                <p class="mb-0"><strong>Top cafe:</strong> {{ order_analytics.top_cafe.name }} ({{ order_analytics.top_cafe.orders }} orders)</p>
                 {% endif %}
             </div>
         </div>
@@ -86,7 +135,6 @@
             <div class="card-body">
                 {% if current_user.role == 'vendor' %}
                 <p><strong>Customer:</strong> {{ order.customer.full_name }} ({{ order.customer.email }})</p>
-                <p><strong>Stall:</strong> {{ order.cafe.name }}</p>
                 {% endif %}
                 <p><strong>Status:</strong> {{ order.status }}</p>
                 <p><strong>Total:</strong> ${{ "%.2f"|format(order.total_amount) }}</p>
@@ -104,7 +152,7 @@
     {% endfor %}
 </div>
 {% else %}
-<p>{% if current_user.role == 'vendor' %}No customer orders have been placed for your stalls yet.{% else %}You have no orders yet.{% endif %}</p>
+<p>{% if current_user.role == 'vendor' %}No customer orders have been placed for your cafe yet.{% else %}You have no orders yet.{% endif %}</p>
 {% endif %}
 
 <div class="mt-3">

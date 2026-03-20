@@ -1,35 +1,197 @@
 {% extends "base.html" %}
 
 {% block title %}Home - Café Discovery{% endblock %}
+{% block head %}
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+>
+{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h1>Welcome to Café Discovery</h1>
-        <p>Discover amazing home-based cafés near you. Order delicious food and earn loyalty points!</p>
-        
-        <div class="mb-4">
-            <form class="d-flex" method="get" action="/cafes">
-                <input class="form-control me-2" type="search" name="search" placeholder="Search cafés..." aria-label="Search">
-                <button class="btn btn-outline-success" type="submit">Search</button>
-            </form>
-        </div>
-
-        <h2>Featured Cafés</h2>
-        <div class="row">
-            {% for cafe in cafes %}
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ cafe.name }}</h5>
-                        <p class="card-text">{{ cafe.description }}</p>
-                        <p class="card-text"><small class="text-muted">{{ cafe.address }}</small></p>
-                        <a href="/cafes/{{ cafe.id }}?role={{ current_user.role }}" class="btn btn-primary">View Menu</a>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
+<section class="home-hero">
+    <div class="home-hero__copy">
+        <p class="eyebrow">Cafe discovery</p>
+        <h1>Find nearby cafes, map the neighborhood, and discover where to order next.</h1>
+        <p class="home-hero__lead">Browse the local scene, compare what each cafe is known for, and jump straight into the places that feel worth trying. Use the cafes page when you want to search the full directory.</p>
+        <div class="home-hero__actions">
+            <a href="/cafes" class="btn btn-primary btn-lg">Open Cafe Directory</a>
+            <a href="#nearby-map" class="btn btn-outline-light btn-lg">Explore Map</a>
         </div>
     </div>
-</div>
+    <div class="home-hero__stats">
+        <div class="home-stat">
+            <span class="home-stat__value">{{ cafe_count }}</span>
+            <span class="home-stat__label">Cafes listed</span>
+        </div>
+        <div class="home-stat">
+            <span class="home-stat__value">{{ user_count }}</span>
+            <span class="home-stat__label">Users on platform</span>
+        </div>
+        <div class="home-stat">
+            <span class="home-stat__value">{{ recommended_cafes|length }}</span>
+            <span class="home-stat__label">Recommended picks</span>
+        </div>
+    </div>
+</section>
+
+<section class="dashboard-grid dashboard-grid--split">
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Nearby map</p>
+                <h3>Singapore cafe map</h3>
+            </div>
+        </div>
+        <div class="home-map" id="nearby-map">
+            <div id="home-map-leaflet" class="home-map__leaflet"></div>
+            <div class="home-map__hint">
+                <span>Pan and zoom the map</span>
+                <span>Actual Singapore pin locations</span>
+            </div>
+        </div>
+        <p class="text-muted mb-0">Use the map to explore where each cafe is located around Singapore.</p>
+    </article>
+
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Nearby cafes</p>
+                <h3>Closest places to browse</h3>
+            </div>
+        </div>
+        <div class="list-stack">
+            {% for cafe in nearby_cafes %}
+            <a href="/cafes/{{ cafe.id }}" class="home-list-link">
+                <div class="list-row">
+                    <div>
+                        <strong>{{ cafe.name }}</strong>
+                        <p>{{ cafe.address }}</p>
+                    </div>
+                    <div class="list-row__meta">
+                        <span>{{ cafe.distance_km }} km away</span>
+                        <span>
+                            {% if cafe.average_rating %}
+                            <span class="rating-stars" aria-label="{{ cafe.average_rating }} out of 5 stars">
+                                {% for _ in range(cafe.star_count) %}<span class="rating-stars__star">★</span>{% endfor %}
+                            </span>
+                            <span class="rating-stars__value">{{ cafe.average_rating }}</span>
+                            {% else %}
+                            New
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="dashboard-card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Recommended</p>
+            <h3>Cafes worth checking out</h3>
+        </div>
+    </div>
+    <div class="row">
+        {% for cafe in recommended_cafes %}
+        <div class="col-md-4">
+            <div class="card home-rec-card">
+                <img src="{{ cafe_image_url(cafe.name) }}" class="card-img-top cafe-card__image" alt="{{ cafe.name }}">
+                <div class="card-body">
+                    <span class="home-rec-card__tag">Recommended</span>
+                    <h5 class="card-title mt-3">{{ cafe.name }}</h5>
+                    <p class="card-text">{{ cafe.description }}</p>
+                    <p class="card-text"><small class="text-muted">{{ cafe.address }}</small></p>
+                    <div class="home-rec-card__meta">
+                        <span>
+                            {% if cafe.average_rating %}
+                            <span class="rating-stars" aria-label="{{ cafe.average_rating }} out of 5 stars">
+                                {% for _ in range(cafe.star_count) %}<span class="rating-stars__star">★</span>{% endfor %}
+                            </span>
+                            <span class="rating-stars__value">{{ cafe.average_rating }}</span>
+                            {% else %}
+                            New
+                            {% endif %}
+                        </span>
+                        <span>{{ cafe.review_count }} review{% if cafe.review_count != 1 %}s{% endif %}</span>
+                        <span>{{ cafe.distance_km }} km away</span>
+                    </div>
+                    <a href="/cafes/{{ cafe.id }}?role={{ current_user.role }}" class="btn btn-primary mt-3">View Menu</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="dashboard-card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">All cafes</p>
+            <h3>Browse the full directory</h3>
+        </div>
+    </div>
+    <div class="home-directory-cta">
+        <div>
+            <strong>See the full marketplace in one place.</strong>
+            <p class="mb-0 text-muted">Open the cafes page for the full searchable directory with all listings and cafe photos.</p>
+        </div>
+        <a href="/cafes" class="btn btn-primary">Go to Cafes Page</a>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+></script>
+<script>
+const mapPoints = {{ map_points | tojson }};
+const mapElement = document.getElementById('home-map-leaflet');
+
+if (mapElement && window.L) {
+    const map = L.map('home-map-leaflet', {
+        scrollWheelZoom: false,
+    }).setView([1.2903, 103.8519], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    const cafeIcon = L.divIcon({
+        className: 'home-map-pin',
+        html: '<span></span>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+    });
+
+    const areaIcon = L.divIcon({
+        className: 'home-map-pin home-map-pin--area',
+        html: '<span></span>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+    });
+
+    const bounds = [];
+    mapPoints.forEach((point) => {
+        const marker = L.marker([point.lat, point.lng], {
+            icon: point.kind === 'area' ? areaIcon : cafeIcon,
+        }).addTo(map);
+        marker.bindPopup(`<strong>${point.name}</strong><br>${point.address}`);
+        bounds.push([point.lat, point.lng]);
+    });
+
+    if (bounds.length) {
+        map.fitBounds(bounds, { padding: [24, 24] });
+    }
+}
+</script>
 {% endblock %}

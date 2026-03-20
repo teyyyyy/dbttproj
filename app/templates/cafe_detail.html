@@ -5,6 +5,9 @@
 {% block content %}
 <div class="row">
     <div class="col-md-8">
+        <div class="mb-3">
+            <a href="/cafes" class="btn btn-outline-secondary">Back to Cafes</a>
+        </div>
         <h1>{{ cafe.name }}</h1>
         <p>{{ cafe.description }}</p>
         <p><strong>Address:</strong> {{ cafe.address }}</p>
@@ -25,6 +28,7 @@
                 {% for item in items %}
                 <div class="col-md-6">
                     <div class="card menu-item-card">
+                        <img src="{{ menu_item_image_url(item.name, item.category) }}" class="card-img-top menu-item-card__image" alt="{{ item.name }}">
                         <div class="card-body">
                             <div class="menu-item-card__top">
                                 <h5 class="card-title">{{ item.name }}</h5>
@@ -56,6 +60,18 @@
             <div class="card-body">
                 <div id="cart-items"></div>
                 <button class="btn btn-primary" id="place-order">Place Order</button>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if current_user and current_user.role == 'vendor' %}
+        <div class="card {% if not reviews %}mt-3{% endif %}">
+            <div class="card-header">
+                <h5>Vendor Actions</h5>
+            </div>
+            <div class="card-body d-grid gap-2">
+                <a href="/cafes/{{ cafe.id }}/edit" class="btn btn-secondary">Open Menu Manager</a>
+                <a href="/dashboard" class="btn btn-outline-secondary">Back to Dashboard</a>
             </div>
         </div>
         {% endif %}
@@ -108,28 +124,32 @@ function removeFromCart(index) {
     updateCart();
 }
 
-document.getElementById('place-order').addEventListener('click', function() {
-    if (cart.length === 0) {
-        alert('Cart is empty!');
-        return;
-    }
-    // Simulate payment
-    alert('Simulating payment... Please enter payment details.');
-    // For demo, assume payment success
-    fetch('/checkout', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({cafe_id: cafeId, items: cart.map(item => ({id: parseInt(item.id), quantity: item.quantity})), delivery_address: 'Default Address'})
-    }).then(response => response.json()).then(data => {
-        alert('Order placed!');
-        cart = [];
-        localStorage.setItem('cart', JSON.stringify(cart));
-        updateCart();
-        window.location.href = '/orders';
-    }).catch(err => {
-        alert('Error placing order');
-        console.error(err);
+const placeOrderButton = document.getElementById('place-order');
+if (placeOrderButton) {
+    updateCart();
+    placeOrderButton.addEventListener('click', function() {
+        if (cart.length === 0) {
+            alert('Cart is empty!');
+            return;
+        }
+        // Simulate payment
+        alert('Simulating payment... Please enter payment details.');
+        // For demo, assume payment success
+        fetch('/checkout', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({cafe_id: cafeId, items: cart.map(item => ({id: parseInt(item.id), quantity: item.quantity})), delivery_address: 'Default Address'})
+        }).then(response => response.json()).then(data => {
+            alert('Order placed!');
+            cart = [];
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCart();
+            window.location.href = '/orders';
+        }).catch(err => {
+            alert('Error placing order');
+            console.error(err);
+        });
     });
-});
+}
 </script>
 {% endblock %}

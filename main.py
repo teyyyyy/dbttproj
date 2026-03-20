@@ -1,5 +1,6 @@
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
+from math import asin, cos, radians, sin, sqrt
 from typing import Optional
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form
@@ -32,6 +33,17 @@ def seed_data(db: Session):
             db.add(user)
             db.commit()
             db.refresh(user)
+        else:
+            updated = False
+            if user.full_name != full_name:
+                user.full_name = full_name
+                updated = True
+            if user.role != role:
+                user.role = role
+                updated = True
+            if updated:
+                db.commit()
+                db.refresh(user)
         return user
 
     def ensure_cafe(vendor_id: int, name: str, description: str, address: str, latitude: float, longitude: float, operating_hours: str):
@@ -49,6 +61,21 @@ def seed_data(db: Session):
             db.add(cafe)
             db.commit()
             db.refresh(cafe)
+        else:
+            updated = False
+            for field, value in {
+                "description": description,
+                "address": address,
+                "latitude": latitude,
+                "longitude": longitude,
+                "operating_hours": operating_hours,
+            }.items():
+                if getattr(cafe, field) != value:
+                    setattr(cafe, field, value)
+                    updated = True
+            if updated:
+                db.commit()
+                db.refresh(cafe)
         return cafe
 
     def ensure_menu_item(cafe_id: int, name: str, description: str, price: float, category: str, is_available: bool = True):
@@ -117,30 +144,96 @@ def seed_data(db: Session):
         db.refresh(order)
         return order
 
+    def ensure_review(user_id: int, cafe_id: int, rating: float, comment: str):
+        review = (
+            db.query(Review)
+            .filter(
+                Review.user_id == user_id,
+                Review.cafe_id == cafe_id,
+                Review.comment == comment,
+            )
+            .first()
+        )
+        if review is None:
+            review = Review(user_id=user_id, cafe_id=cafe_id, rating=rating, comment=comment)
+            db.add(review)
+            db.commit()
+            db.refresh(review)
+        return review
+
     # Seed demo users if not exists
-    customer = ensure_user("customer@gmail.com", "Jane Customer", "customer")
+    customer = ensure_user("customer@gmail.com", "Chloe Lim", "customer")
     vendor = ensure_user("vendor@gmail.com", "John Vendor", "vendor")
-    repeat_customer = ensure_user("amelia@gmail.com", "Amelia Tan", "customer")
-    office_customer = ensure_user("raj@gmail.com", "Raj Kumar", "customer")
-    family_customer = ensure_user("siti@gmail.com", "Siti Rahman", "customer")
+    pastry_vendor = ensure_user("mei@sunnyoven.com", "Mei Lin", "vendor")
+    tea_vendor = ensure_user("daniel@leaflane.com", "Daniel Goh", "vendor")
+    brunch_vendor = ensure_user("nora@brunchroom.com", "Nora Lee", "vendor")
+    dessert_vendor = ensure_user("farah@moonwhisk.com", "Farah Aziz", "vendor")
+    repeat_customer = ensure_user("amelia@gmail.com", "Aisha Noor", "customer")
+    office_customer = ensure_user("raj@gmail.com", "Marcus Teo", "customer")
+    family_customer = ensure_user("siti@gmail.com", "Priya Menon", "customer")
 
     cafe1 = ensure_cafe(
         vendor.id,
         "Cozy Corner Café",
         "A cozy spot for coffee, matcha drinks, and pastries.",
-        "123 Main St, City",
-        40.7128,
-        -74.0060,
+        "14 Eng Hoon Street, Singapore",
+        1.2857,
+        103.8321,
         "Mon-Fri 8AM-6PM",
     )
     cafe2 = ensure_cafe(
         vendor.id,
         "Brew & Bites",
         "Fresh brews, rice bowls, and comfort food for busy customers.",
-        "456 Oak Ave, City",
-        40.7589,
-        -73.9851,
+        "87 Beach Road, Singapore",
+        1.3012,
+        103.8601,
         "Daily 7AM-8PM",
+    )
+    cafe3 = ensure_cafe(
+        pastry_vendor.id,
+        "Sunny Oven Studio",
+        "Small-batch sourdough bakes, laminated pastries, and seasonal jam buns.",
+        "18 Tiong Bahru Lane, Singapore",
+        1.2866,
+        103.8272,
+        "Wed-Sun 8AM-4PM",
+    )
+    cafe4 = ensure_cafe(
+        tea_vendor.id,
+        "Leaf & Lane",
+        "Modern tea bar serving hojicha lattes, milk tea, and light Japanese bites.",
+        "72 Joo Chiat Road, Singapore",
+        1.3142,
+        103.9016,
+        "Daily 11AM-9PM",
+    )
+    cafe5 = ensure_cafe(
+        brunch_vendor.id,
+        "Brunch Bureau",
+        "All-day brunch plates, eggs, toasties, and cold brew for the neighborhood crowd.",
+        "9 Everton Park, Singapore",
+        1.2769,
+        103.8398,
+        "Tue-Sun 9AM-5PM",
+    )
+    cafe6 = ensure_cafe(
+        dessert_vendor.id,
+        "Moonwhisk Desserts",
+        "Late-night desserts with tarts, brownies, soft-serve, and bottled drinks.",
+        "33 Haji Lane, Singapore",
+        1.3007,
+        103.8599,
+        "Thu-Tue 1PM-10PM",
+    )
+    cafe7 = ensure_cafe(
+        tea_vendor.id,
+        "Harbor Toast House",
+        "Comfort breakfast sets, kopi, and hearty toast sandwiches for office pickups.",
+        "101 Telok Ayer Street, Singapore",
+        1.2822,
+        103.8485,
+        "Mon-Fri 7AM-3PM",
     )
 
     cozy_corner_items = [
@@ -164,6 +257,36 @@ def seed_data(db: Session):
         ("Blueberry Muffin", "Blueberry muffin.", 3.00, "pastry", True),
         ("Chocolate Financier", "Almond cake with dark chocolate.", 4.20, "dessert", True),
     ]
+    sunny_oven_items = [
+        ("Pain Au Chocolat", "Flaky laminated pastry with dark chocolate batons.", 5.20, "pastry", True),
+        ("Sea Salt Focaccia", "Rosemary focaccia with sea salt flakes.", 6.80, "food", True),
+        ("Burnt Honey Kouign Amann", "Caramelised Breton pastry with buttery layers.", 5.80, "pastry", True),
+        ("Iced White", "Double ristretto with cold milk over ice.", 5.00, "drink", True),
+    ]
+    leaf_lane_items = [
+        ("Hojicha Latte", "Roasted tea latte with deep nutty notes.", 5.60, "drink", True),
+        ("Genmaicha Yuzu Soda", "Sparkling yuzu with toasted rice tea.", 6.20, "drink", True),
+        ("Tamago Sando", "Japanese egg sandwich on shokupan.", 7.50, "food", True),
+        ("Mochi Waffle", "Crisp mochi waffle with kinako dusting.", 8.80, "dessert", True),
+    ]
+    brunch_bureau_items = [
+        ("Truffle Scramble Toast", "Soft scrambled eggs with truffle on thick toast.", 12.50, "food", True),
+        ("Chicken Avo Bagel", "Grilled chicken bagel with avocado spread.", 11.80, "food", True),
+        ("Orange Cold Brew", "Cold brew brightened with orange tonic.", 6.00, "drink", True),
+        ("Banana Walnut Loaf", "House-baked loaf served warm.", 5.40, "dessert", True),
+    ]
+    moonwhisk_items = [
+        ("Pistachio Tart", "Buttery tart shell with pistachio cream.", 8.50, "dessert", True),
+        ("Dark Chocolate Brownie", "Fudgy brownie with flaky sea salt.", 5.20, "dessert", True),
+        ("Strawberry Milk", "Fresh strawberry milk in a bottled serve.", 4.80, "drink", True),
+        ("Vanilla Soft Serve Cup", "Classic soft serve with cookie crumble.", 6.00, "dessert", True),
+    ]
+    harbor_toast_items = [
+        ("Kopi C", "Traditional kopi with evaporated milk.", 2.20, "drink", True),
+        ("Peanut Butter French Toast", "Sweet-savoury toast with peanut butter center.", 6.20, "food", True),
+        ("Turkey Melt", "Toasted sandwich with turkey and cheddar.", 8.90, "food", True),
+        ("Lemon Tea", "Brewed black tea with fresh lemon slices.", 3.20, "drink", True),
+    ]
 
     for item_name, description, price, category, is_available in cozy_corner_items:
         ensure_menu_item(cafe1.id, item_name, description, price, category, is_available)
@@ -171,11 +294,36 @@ def seed_data(db: Session):
     for item_name, description, price, category, is_available in brew_bites_items:
         ensure_menu_item(cafe2.id, item_name, description, price, category, is_available)
 
-    if db.query(Review).filter(Review.user_id == customer.id, Review.cafe_id == cafe1.id).first() is None:
-        db.add(Review(user_id=customer.id, cafe_id=cafe1.id, rating=5, comment="Amazing coffee and matcha selection!"))
-    if db.query(Review).filter(Review.user_id == customer.id, Review.cafe_id == cafe2.id).first() is None:
-        db.add(Review(user_id=customer.id, cafe_id=cafe2.id, rating=4, comment="Great sandwiches and reliable delivery."))
-    db.commit()
+    for item_name, description, price, category, is_available in sunny_oven_items:
+        ensure_menu_item(cafe3.id, item_name, description, price, category, is_available)
+
+    for item_name, description, price, category, is_available in leaf_lane_items:
+        ensure_menu_item(cafe4.id, item_name, description, price, category, is_available)
+
+    for item_name, description, price, category, is_available in brunch_bureau_items:
+        ensure_menu_item(cafe5.id, item_name, description, price, category, is_available)
+
+    for item_name, description, price, category, is_available in moonwhisk_items:
+        ensure_menu_item(cafe6.id, item_name, description, price, category, is_available)
+
+    for item_name, description, price, category, is_available in harbor_toast_items:
+        ensure_menu_item(cafe7.id, item_name, description, price, category, is_available)
+
+    demo_reviews = [
+        (customer.id, cafe1.id, 5, "Love the matcha drinks here. The croissant was fresh too."),
+        (repeat_customer.id, cafe1.id, 4, "Strawberry Matcha is super smooth and not too sweet."),
+        (office_customer.id, cafe1.id, 5, "Coffee arrived hot and the kaya toast made a great breakfast."),
+        (customer.id, cafe2.id, 4, "Reliable lunch option. The miso chicken bowl travels well."),
+        (family_customer.id, cafe2.id, 5, "Club sandwich was generous and the iced matcha cloud was a hit."),
+        (office_customer.id, cafe2.id, 4, "Fast delivery and good portion size for weekday orders."),
+        (repeat_customer.id, cafe3.id, 5, "The kouign amann had amazing layers and stayed crisp even later in the day."),
+        (customer.id, cafe4.id, 4, "Really liked the hojicha latte. It tastes roasted instead of overly sweet."),
+        (family_customer.id, cafe5.id, 5, "Great brunch portions and the bagel arrived neatly packed."),
+        (office_customer.id, cafe6.id, 4, "Desserts are rich without being too heavy. Nice for sharing."),
+        (customer.id, cafe7.id, 4, "Solid breakfast stop with comforting kopi and toast options."),
+    ]
+    for user_id, cafe_id, rating, comment in demo_reviews:
+        ensure_review(user_id, cafe_id, rating, comment)
 
     demo_orders = [
         (customer.id, cafe1.id, "18 Garden View", "Platform booking 001", "delivered", 4, [("Matcha Latte", 2), ("Croissant", 1)]),
@@ -223,6 +371,73 @@ def cleanup_duplicate_cafes(db: Session):
         canonical_cafe = cafes[0]
 
         for duplicate_cafe in cafes[1:]:
+            duplicate_menu_items = (
+                db.query(MenuItem)
+                .filter(MenuItem.cafe_id == duplicate_cafe.id)
+                .order_by(MenuItem.id.asc())
+                .all()
+            )
+            for menu_item in duplicate_menu_items:
+                canonical_item = (
+                    db.query(MenuItem)
+                    .filter(
+                        MenuItem.cafe_id == canonical_cafe.id,
+                        func.lower(func.trim(MenuItem.name)) == func.lower(func.trim(menu_item.name)),
+                    )
+                    .first()
+                )
+                if canonical_item:
+                    db.query(OrderItem).filter(OrderItem.menu_item_id == menu_item.id).update(
+                        {"menu_item_id": canonical_item.id},
+                        synchronize_session=False,
+                    )
+                    canonical_item.is_available = canonical_item.is_available or menu_item.is_available
+                    db.delete(menu_item)
+                else:
+                    menu_item.cafe_id = canonical_cafe.id
+
+            db.flush()
+
+            db.query(Order).filter(Order.cafe_id == duplicate_cafe.id).update(
+                {"cafe_id": canonical_cafe.id},
+                synchronize_session=False,
+            )
+            db.query(Review).filter(Review.cafe_id == duplicate_cafe.id).update(
+                {"cafe_id": canonical_cafe.id},
+                synchronize_session=False,
+            )
+            db.query(Cafe).filter(Cafe.id == duplicate_cafe.id).delete(synchronize_session=False)
+
+    db.commit()
+
+
+def cleanup_duplicate_cafes_by_name(db: Session):
+    duplicate_groups = (
+        db.query(
+            func.lower(func.trim(Cafe.name)).label("normalized_name"),
+            func.count(Cafe.id).label("cafe_count"),
+        )
+        .group_by(func.lower(func.trim(Cafe.name)))
+        .having(func.count(Cafe.id) > 1)
+        .all()
+    )
+
+    for group in duplicate_groups:
+        cafes = (
+            db.query(Cafe)
+            .filter(func.lower(func.trim(Cafe.name)) == group.normalized_name)
+            .order_by(Cafe.id.asc())
+            .all()
+        )
+        canonical_cafe = cafes[0]
+
+        for duplicate_cafe in cafes[1:]:
+            canonical_cafe.description = duplicate_cafe.description or canonical_cafe.description
+            canonical_cafe.address = duplicate_cafe.address or canonical_cafe.address
+            canonical_cafe.latitude = duplicate_cafe.latitude or canonical_cafe.latitude
+            canonical_cafe.longitude = duplicate_cafe.longitude or canonical_cafe.longitude
+            canonical_cafe.operating_hours = duplicate_cafe.operating_hours or canonical_cafe.operating_hours
+
             duplicate_menu_items = (
                 db.query(MenuItem)
                 .filter(MenuItem.cafe_id == duplicate_cafe.id)
@@ -315,6 +530,64 @@ def cleanup_duplicate_menu_items(db: Session):
     db.commit()
 
 
+def cleanup_duplicate_reviews(db: Session):
+    duplicate_groups = (
+        db.query(
+            Review.user_id,
+            Review.cafe_id,
+            Review.rating,
+            Review.comment,
+            func.count(Review.id).label("review_count"),
+        )
+        .group_by(Review.user_id, Review.cafe_id, Review.rating, Review.comment)
+        .having(func.count(Review.id) > 1)
+        .all()
+    )
+
+    for group in duplicate_groups:
+        reviews = (
+            db.query(Review)
+            .filter(
+                Review.user_id == group.user_id,
+                Review.cafe_id == group.cafe_id,
+                Review.rating == group.rating,
+                Review.comment == group.comment,
+            )
+            .order_by(Review.id.asc())
+            .all()
+        )
+        for duplicate_review in reviews[1:]:
+            db.delete(duplicate_review)
+
+    db.commit()
+
+
+def cleanup_legacy_demo_reviews(db: Session):
+    legacy_comments = [
+        "Amazing coffee!",
+        "Great sandwiches.",
+        "Amazing coffee and matcha selection!",
+        "Great sandwiches and reliable delivery.",
+    ]
+    db.query(Review).filter(Review.comment.in_(legacy_comments)).delete(synchronize_session=False)
+    db.commit()
+
+
+def cleanup_legacy_demo_user_names(db: Session):
+    rename_map = {
+        "customer@example.com": "Nadia Wong",
+        "customer@gmail.com": "Chloe Lim",
+        "amelia@gmail.com": "Aisha Noor",
+        "raj@gmail.com": "Marcus Teo",
+        "siti@gmail.com": "Priya Menon",
+    }
+    for email, full_name in rename_map.items():
+        user = db.query(User).filter(User.email == email).first()
+        if user and user.full_name != full_name:
+            user.full_name = full_name
+    db.commit()
+
+
 def build_order_analytics(orders: list[Order]):
     total_orders = len(orders)
     total_revenue = sum(order.total_amount for order in orders)
@@ -342,10 +615,27 @@ def build_order_analytics(orders: list[Order]):
         "status_counts": status_counts,
     }
 
+
+def get_managed_cafe_for_vendor(db: Session, vendor_id: int):
+    return (
+        db.query(Cafe)
+        .filter(Cafe.vendor_id == vendor_id)
+        .order_by(Cafe.id.asc())
+        .first()
+    )
+
+
+def get_visible_cafes_for_user(db: Session, current_user: Optional[User]):
+    return db.query(Cafe).all()
+
 seed_data(SessionLocal())
 cleanup_duplicate_cafes(SessionLocal())
+cleanup_duplicate_cafes_by_name(SessionLocal())
 repair_orphaned_menu_items(SessionLocal())
 cleanup_duplicate_menu_items(SessionLocal())
+cleanup_duplicate_reviews(SessionLocal())
+cleanup_legacy_demo_reviews(SessionLocal())
+cleanup_legacy_demo_user_names(SessionLocal())
 
 app = FastAPI(title="Café Discovery Platform", version="1.0.0")
 
@@ -354,6 +644,42 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Templates
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["cafe_image_url"] = lambda cafe_name: {
+    "Cozy Corner Café": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80",
+    "Brew & Bites": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80",
+    "Sunny Oven Studio": "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?auto=format&fit=crop&w=1200&q=80",
+    "Leaf & Lane": "https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1200&q=80",
+    "Brunch Bureau": "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80",
+    "Moonwhisk Desserts": "https://images.unsplash.com/photo-1481833761820-0509d3217039?auto=format&fit=crop&w=1200&q=80",
+    "Harbor Toast House": "https://images.unsplash.com/photo-1453614512568-c4024d13c247?auto=format&fit=crop&w=1200&q=80",
+}.get(cafe_name, "https://images.unsplash.com/photo-1445116572660-236099ec97a0?auto=format&fit=crop&w=1200&q=80")
+templates.env.globals["menu_item_image_url"] = lambda item_name, category='food': {
+    "Espresso": "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=1200&q=80",
+    "Cappuccino": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?auto=format&fit=crop&w=1200&q=80",
+    "Matcha Latte": "https://images.unsplash.com/photo-1515823064-d6e0c04616a7?auto=format&fit=crop&w=1200&q=80",
+    "Strawberry Matcha": "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=1200&q=80",
+    "Yuzu Cold Brew": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?auto=format&fit=crop&w=1200&q=80",
+    "Croissant": "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1200&q=80",
+    "Kaya Butter Toast": "https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=1200&q=80",
+    "Avocado Toast": "https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?auto=format&fit=crop&w=1200&q=80",
+    "Burnt Cheesecake Slice": "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&w=1200&q=80",
+    "Latte": "https://images.unsplash.com/photo-1494314671902-399b18174975?auto=format&fit=crop&w=1200&q=80",
+    "Americano": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80",
+    "Iced Matcha Cloud": "https://images.unsplash.com/photo-1515823064-d6e0c04616a7?auto=format&fit=crop&w=1200&q=80",
+    "Club Sandwich": "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=1200&q=80",
+    "Miso Chicken Bowl": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80",
+    "Truffle Egg Mayo Sando": "https://images.unsplash.com/photo-1553909489-cd47e0ef937f?auto=format&fit=crop&w=1200&q=80",
+    "Blueberry Muffin": "https://images.unsplash.com/photo-1607958996333-41aef7caefaa?auto=format&fit=crop&w=1200&q=80",
+    "Chocolate Financier": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=1200&q=80",
+}.get(
+    item_name,
+    {
+        "drink": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80",
+        "food": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80",
+        "pastry": "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?auto=format&fit=crop&w=1200&q=80",
+        "dessert": "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=1200&q=80",
+    }.get(category, "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80")
+)
 
 # Include routers
 app.include_router(cafes.router, prefix="/api/cafes", tags=["Cafes"])
@@ -375,20 +701,206 @@ def group_menu_items(menu_items):
         grouped[item.category.capitalize()].append(item)
     return dict(grouped)
 
+
+def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    radius_km = 6371
+    d_lat = radians(lat2 - lat1)
+    d_lon = radians(lon2 - lon1)
+    a = (
+        sin(d_lat / 2) ** 2
+        + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lon / 2) ** 2
+    )
+    return 2 * radius_km * asin(sqrt(a))
+
+
+def build_home_discovery_data(cafes: list[Cafe], db: Session):
+    if not cafes:
+        return [], [], []
+
+    reference_lat = 1.2903
+    reference_lon = 103.8519
+    review_summary = {
+        cafe_id: {"count": 0, "rating_total": 0.0}
+        for cafe_id in [cafe.id for cafe in cafes]
+    }
+
+    for review in db.query(Review).filter(Review.cafe_id.in_(review_summary.keys())).all():
+        review_summary[review.cafe_id]["count"] += 1
+        review_summary[review.cafe_id]["rating_total"] += review.rating
+
+    enriched_cafes = []
+    for cafe in cafes:
+        summary = review_summary.get(cafe.id, {"count": 0, "rating_total": 0.0})
+        average_rating = (
+            summary["rating_total"] / summary["count"]
+            if summary["count"]
+            else 0.0
+        )
+        distance_km = calculate_distance_km(reference_lat, reference_lon, cafe.latitude, cafe.longitude)
+        enriched_cafes.append(
+            {
+                "id": cafe.id,
+                "name": cafe.name,
+                "description": cafe.description,
+                "address": cafe.address,
+                "operating_hours": cafe.operating_hours,
+                "distance_km": round(distance_km, 1),
+                "average_rating": round(average_rating, 1) if average_rating else None,
+                "star_count": max(1, min(5, int(average_rating + 0.5))) if average_rating else 0,
+                "review_count": summary["count"],
+            }
+        )
+
+    nearby_cafes = sorted(enriched_cafes, key=lambda cafe: cafe["distance_km"])[:4]
+    recommended_cafes = sorted(
+        enriched_cafes,
+        key=lambda cafe: (
+            cafe["average_rating"] or 0,
+            cafe["review_count"],
+            -cafe["distance_km"],
+        ),
+        reverse=True,
+    )[:3]
+
+    map_points = []
+    for cafe in cafes:
+        map_points.append(
+            {
+                "id": cafe.id,
+                "kind": "cafe",
+                "name": cafe.name,
+                "address": cafe.address,
+                "lat": cafe.latitude,
+                "lng": cafe.longitude,
+            }
+        )
+
+    area_points = [
+        {"id": "area-tiong-bahru", "kind": "area", "name": "Tiong Bahru", "address": "Cafe cluster", "lat": 1.2850, "lng": 103.8264},
+        {"id": "area-bugis", "kind": "area", "name": "Bugis", "address": "Popular dessert zone", "lat": 1.3009, "lng": 103.8559},
+        {"id": "area-joo-chiat", "kind": "area", "name": "Joo Chiat", "address": "Tea and brunch stretch", "lat": 1.3148, "lng": 103.9011},
+        {"id": "area-telok-ayer", "kind": "area", "name": "Telok Ayer", "address": "Breakfast and office crowd", "lat": 1.2827, "lng": 103.8488},
+        {"id": "area-everton", "kind": "area", "name": "Everton Park", "address": "Weekend brunch pocket", "lat": 1.2765, "lng": 103.8396},
+    ]
+
+    return nearby_cafes, recommended_cafes, map_points + area_points
+
+
+def build_cafe_directory_data(cafes: list[Cafe], db: Session):
+    if not cafes:
+        return []
+
+    reference_lat = 1.2903
+    reference_lon = 103.8519
+    cafe_ids = [cafe.id for cafe in cafes]
+
+    review_summary = {cafe_id: {"count": 0, "rating_total": 0.0} for cafe_id in cafe_ids}
+    category_summary = {cafe_id: set() for cafe_id in cafe_ids}
+
+    for review in db.query(Review).filter(Review.cafe_id.in_(cafe_ids)).all():
+        review_summary[review.cafe_id]["count"] += 1
+        review_summary[review.cafe_id]["rating_total"] += review.rating
+
+    for menu_item in db.query(MenuItem).filter(MenuItem.cafe_id.in_(cafe_ids)).all():
+        if menu_item.category:
+            category_summary[menu_item.cafe_id].add(menu_item.category.lower())
+
+    enriched = []
+    for cafe in cafes:
+        summary = review_summary[cafe.id]
+        average_rating = summary["rating_total"] / summary["count"] if summary["count"] else 0.0
+        category_list = sorted(category_summary[cafe.id])
+        enriched.append(
+            {
+                "id": cafe.id,
+                "name": cafe.name,
+                "description": cafe.description,
+                "address": cafe.address,
+                "distance_km": round(calculate_distance_km(reference_lat, reference_lon, cafe.latitude, cafe.longitude), 1),
+                "average_rating": round(average_rating, 1) if average_rating else None,
+                "star_count": max(1, min(5, int(average_rating + 0.5))) if average_rating else 0,
+                "review_count": summary["count"],
+                "categories": category_list,
+                "category_label": ", ".join(category.capitalize() for category in category_list[:2]),
+            }
+        )
+
+    return enriched
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, db: Session = Depends(get_db), current_user = Depends(get_current_user_optional)):
-    cafes = db.query(Cafe).limit(6).all()
-    cafe_count = db.query(Cafe).count()
+    visible_cafes = get_visible_cafes_for_user(db, current_user)
+    cafes = visible_cafes
+    cafe_count = len(visible_cafes)
     user_count = db.query(User).count()
-    return templates.TemplateResponse("home.html", {"request": request, "cafes": cafes, "cafe_count": cafe_count, "user_count": user_count, "current_user": current_user})
+    nearby_cafes, recommended_cafes, map_points = build_home_discovery_data(cafes, db)
+    return templates.TemplateResponse(
+        "home.html",
+        {
+            "request": request,
+            "cafes": cafes,
+            "cafe_count": cafe_count,
+            "user_count": user_count,
+            "current_user": current_user,
+            "nearby_cafes": nearby_cafes,
+            "recommended_cafes": recommended_cafes,
+            "map_points": map_points,
+        },
+    )
 
 @app.get("/cafes", response_class=HTMLResponse)
-async def list_cafes(request: Request, search: str = "", db: Session = Depends(get_db), current_user = Depends(get_current_user_optional)):
-    query = db.query(Cafe)
+async def list_cafes(
+    request: Request,
+    search: str = "",
+    category: str = "",
+    min_rating: str = "",
+    sort: str = "recommended",
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user_optional),
+):
+    visible_cafes = get_visible_cafes_for_user(db, current_user)
+    cafes = build_cafe_directory_data(visible_cafes, db)
+
     if search:
-        query = query.filter(Cafe.name.contains(search))
-    cafes = query.all()
-    return templates.TemplateResponse("cafes.html", {"request": request, "cafes": cafes, "search": search, "current_user": current_user})
+        query = search.lower()
+        cafes = [
+            cafe for cafe in cafes
+            if query in cafe["name"].lower()
+            or query in cafe["description"].lower()
+            or query in cafe["address"].lower()
+        ]
+
+    if category:
+        cafes = [cafe for cafe in cafes if category.lower() in cafe["categories"]]
+
+    if min_rating:
+        try:
+            threshold = float(min_rating)
+            cafes = [cafe for cafe in cafes if (cafe["average_rating"] or 0) >= threshold]
+        except ValueError:
+            pass
+
+    if sort == "distance":
+        cafes = sorted(cafes, key=lambda cafe: (cafe["distance_km"], cafe["name"]))
+    elif sort == "rating":
+        cafes = sorted(cafes, key=lambda cafe: ((cafe["average_rating"] or 0), cafe["review_count"], -cafe["distance_km"]), reverse=True)
+    else:
+        cafes = sorted(cafes, key=lambda cafe: ((cafe["average_rating"] or 0), cafe["review_count"], -cafe["distance_km"]), reverse=True)
+
+    return templates.TemplateResponse(
+        "cafes.html",
+        {
+            "request": request,
+            "cafes": cafes,
+            "search": search,
+            "current_user": current_user,
+            "cafe_filters": {
+                "category": category,
+                "min_rating": min_rating,
+                "sort": sort,
+            },
+        },
+    )
 
 @app.get("/cafes/{cafe_id}", response_class=HTMLResponse)
 async def cafe_detail(request: Request, cafe_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user_optional)):
@@ -437,6 +949,7 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
     
     if current_user.role == "vendor":
         cafes = db.query(Cafe).filter(Cafe.vendor_id == current_user.id).all()
+        managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
         cafe_ids = [c.id for c in cafes]
         menu_items = db.query(MenuItem).filter(MenuItem.cafe_id.in_(cafe_ids)).all() if cafe_ids else []
         orders = (
@@ -480,6 +993,14 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
         daily_booking_map = {}
         customer_summary = {}
         category_sales = defaultdict(lambda: {"label": "", "quantity": 0, "revenue": 0.0})
+        hourly_order_map = {
+            hour: {"label": f"{hour:02d}:00", "count": 0}
+            for hour in range(8, 21, 2)
+        }
+        weekday_revenue_map = {
+            index: {"label": label, "revenue": 0.0}
+            for index, label in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+        }
 
         for offset in range(6, -1, -1):
             day = (now - timedelta(days=offset)).date()
@@ -498,6 +1019,10 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
                 if day_key in daily_revenue_map:
                     daily_revenue_map[day_key]["revenue"] += order.total_amount
                     daily_booking_map[day_key]["count"] += 1
+                order_hour_bucket = order.order_time.hour - (order.order_time.hour % 2)
+                if order_hour_bucket in hourly_order_map:
+                    hourly_order_map[order_hour_bucket]["count"] += 1
+                weekday_revenue_map[order.order_time.weekday()]["revenue"] += order.total_amount
 
             customer = order.customer
             if customer:
@@ -619,6 +1144,7 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
                 "request": request,
                 "current_user": current_user,
                 "cafes": cafes,
+                "managed_cafe": managed_cafe,
                 "orders": orders,
                 "menu_items": menu_items,
                 "total_orders": total_orders,
@@ -637,6 +1163,8 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
                 "top_menu_items": top_menu_items,
                 "weekly_sales_data": list(daily_revenue_map.values()),
                 "weekly_booking_data": list(daily_booking_map.values()),
+                "hourly_order_data": list(hourly_order_map.values()),
+                "weekday_revenue_data": list(weekday_revenue_map.values()),
                 "category_sales_data": category_sales_data,
                 "demand_forecast": demand_forecast,
                 "low_stock_items": low_stock_items,
@@ -652,9 +1180,10 @@ async def dashboard(request: Request, current_user: User = Depends(get_current_u
 async def edit_menu(request: Request, cafe_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_optional)):
     if not current_user or current_user.role != "vendor":
         return RedirectResponse(url="/login", status_code=302)
-    cafe = db.query(Cafe).filter(Cafe.id == cafe_id, Cafe.vendor_id == current_user.id).first()
-    if not cafe:
-        raise HTTPException(status_code=404, detail="Cafe not found")
+    managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
+    if not managed_cafe or managed_cafe.id != cafe_id:
+        raise HTTPException(status_code=403, detail="You can only manage your assigned cafe")
+    cafe = managed_cafe
     menu_items = db.query(MenuItem).filter(MenuItem.cafe_id == cafe_id).all()
     return templates.TemplateResponse(
         "edit_menu.html",
@@ -682,9 +1211,10 @@ async def add_menu_item_page(
     if not current_user or current_user.role != "vendor":
         return RedirectResponse(url="/login", status_code=302)
 
-    cafe = db.query(Cafe).filter(Cafe.id == cafe_id, Cafe.vendor_id == current_user.id).first()
-    if not cafe:
-        raise HTTPException(status_code=404, detail="Cafe not found")
+    managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
+    if not managed_cafe or managed_cafe.id != cafe_id:
+        raise HTTPException(status_code=403, detail="You can only manage your assigned cafe")
+    cafe = managed_cafe
 
     clean_name = name.strip()
     clean_description = description.strip()
@@ -706,8 +1236,44 @@ async def add_menu_item_page(
 
     return RedirectResponse(url=f"/cafes/{cafe_id}/edit", status_code=303)
 
+
+@app.post("/cafes/{cafe_id}/menu/{item_id}/availability")
+async def update_menu_item_availability(
+    cafe_id: int,
+    item_id: int,
+    is_available: str = Form(...),
+    current_user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if not current_user or current_user.role != "vendor":
+        return RedirectResponse(url="/login", status_code=302)
+
+    managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
+    if not managed_cafe or managed_cafe.id != cafe_id:
+        raise HTTPException(status_code=403, detail="You can only manage your assigned cafe")
+    cafe = managed_cafe
+
+    menu_item = db.query(MenuItem).filter(MenuItem.id == item_id, MenuItem.cafe_id == cafe_id).first()
+    if not menu_item:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+
+    menu_item.is_available = is_available == "true"
+    db.commit()
+
+    return RedirectResponse(url=f"/cafes/{cafe_id}/edit", status_code=303)
+
 @app.get("/orders", response_class=HTMLResponse)
-async def user_orders(request: Request, current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+async def user_orders(
+    request: Request,
+    status: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    item_search: str = "",
+    customer_search: str = "",
+    sort: str = "newest",
+    current_user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     if not current_user:
         return RedirectResponse(url="/login", status_code=302)
 
@@ -719,12 +1285,44 @@ async def user_orders(request: Request, current_user: User = Depends(get_current
 
     if current_user.role == "vendor":
         cafe_ids = [cafe.id for cafe in db.query(Cafe).filter(Cafe.vendor_id == current_user.id).all()]
-        orders = query.filter(Order.cafe_id.in_(cafe_ids)).order_by(Order.order_time.desc()).all() if cafe_ids else []
+        query = query.filter(Order.cafe_id.in_(cafe_ids)) if cafe_ids else query.filter(False)
+
+        if status:
+            query = query.filter(Order.status == status)
+        if date_from:
+            try:
+                query = query.filter(func.date(Order.order_time) >= datetime.strptime(date_from, "%Y-%m-%d").date())
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                query = query.filter(func.date(Order.order_time) <= datetime.strptime(date_to, "%Y-%m-%d").date())
+            except ValueError:
+                pass
+        if item_search:
+            query = query.join(Order.items).join(OrderItem.menu_item).filter(MenuItem.name.ilike(f"%{item_search.strip()}%"))
+        if customer_search:
+            query = query.join(Order.customer).filter(
+                (User.full_name.ilike(f"%{customer_search.strip()}%")) |
+                (User.email.ilike(f"%{customer_search.strip()}%"))
+            )
+
+        if sort == "oldest":
+            query = query.order_by(Order.order_time.asc())
+        elif sort == "highest":
+            query = query.order_by(Order.total_amount.desc(), Order.order_time.desc())
+        else:
+            query = query.order_by(Order.order_time.desc())
+
+        orders = query.distinct().all()
     else:
         orders = query.filter(Order.customer_id == current_user.id).order_by(Order.order_time.desc()).all()
 
     points_balance = db.query(func.sum(Point.amount)).filter(Point.user_id == current_user.id).scalar() or 0
     order_analytics = build_order_analytics(orders)
+    managed_cafe = None
+    if current_user.role == "vendor":
+        managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
     return templates.TemplateResponse(
         "orders.html",
         {
@@ -733,6 +1331,15 @@ async def user_orders(request: Request, current_user: User = Depends(get_current
             "current_user": current_user,
             "points_balance": points_balance,
             "order_analytics": order_analytics,
+            "managed_cafe": managed_cafe,
+            "order_filters": {
+                "status": status,
+                "date_from": date_from,
+                "date_to": date_to,
+                "item_search": item_search,
+                "customer_search": customer_search,
+                "sort": sort,
+            },
         },
     )
 

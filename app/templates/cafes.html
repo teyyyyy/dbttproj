@@ -5,22 +5,81 @@
 {% block content %}
 <h1>Cafés</h1>
 
-<div class="mb-4">
-    <form class="d-flex" method="get">
-        <input type="hidden" name="role" value="{{ current_user.role }}">
-        <input class="form-control me-2" type="search" name="search" placeholder="Search cafés..." value="{{ search }}" aria-label="Search">
-        <button class="btn btn-outline-success" type="submit">Search</button>
-    </form>
+<div class="card mb-4">
+    <div class="card-body">
+        <form class="row g-3 align-items-end" method="get">
+            <input type="hidden" name="role" value="{{ current_user.role }}">
+            <div class="col-md-4">
+                <label for="search" class="form-label">Search</label>
+                <input class="form-control" id="search" type="search" name="search" placeholder="Cafe name, area, vibe..." value="{{ search }}" aria-label="Search">
+            </div>
+            <div class="col-md-2">
+                <label for="category" class="form-label">Category</label>
+                <select class="form-select" id="category" name="category">
+                    <option value="">All</option>
+                    <option value="drink" {% if cafe_filters.category == 'drink' %}selected{% endif %}>Drink</option>
+                    <option value="food" {% if cafe_filters.category == 'food' %}selected{% endif %}>Food</option>
+                    <option value="pastry" {% if cafe_filters.category == 'pastry' %}selected{% endif %}>Pastry</option>
+                    <option value="dessert" {% if cafe_filters.category == 'dessert' %}selected{% endif %}>Dessert</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="min_rating" class="form-label">Min rating</label>
+                <select class="form-select" id="min_rating" name="min_rating">
+                    <option value="">Any</option>
+                    <option value="4" {% if cafe_filters.min_rating == '4' %}selected{% endif %}>4.0+</option>
+                    <option value="4.5" {% if cafe_filters.min_rating == '4.5' %}selected{% endif %}>4.5+</option>
+                    <option value="5" {% if cafe_filters.min_rating == '5' %}selected{% endif %}>5.0</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="sort" class="form-label">Sort</label>
+                <select class="form-select" id="sort" name="sort">
+                    <option value="recommended" {% if cafe_filters.sort == 'recommended' %}selected{% endif %}>Recommended</option>
+                    <option value="rating" {% if cafe_filters.sort == 'rating' %}selected{% endif %}>Top rated</option>
+                    <option value="distance" {% if cafe_filters.sort == 'distance' %}selected{% endif %}>Nearest</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button class="btn btn-primary w-100" type="submit">Apply</button>
+                <a href="/cafes" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
 </div>
 
-<div class="row">
+<p class="text-muted" id="cafe-results-count">{{ cafes|length }} cafe{% if cafes|length != 1 %}s{% endif %} found.</p>
+
+<div class="row" id="cafe-results-grid">
     {% for cafe in cafes %}
-    <div class="col-md-4">
-        <div class="card">
+    <div
+        class="col-md-4"
+        data-cafe-card
+        data-name="{{ cafe.name|lower }}"
+        data-description="{{ cafe.description|lower }}"
+        data-address="{{ cafe.address|lower }}"
+    >
+        <div class="card cafe-card h-100">
+            <img src="{{ cafe_image_url(cafe.name) }}" class="card-img-top cafe-card__image" alt="{{ cafe.name }}">
             <div class="card-body">
                 <h5 class="card-title">{{ cafe.name }}</h5>
                 <p class="card-text">{{ cafe.description }}</p>
                 <p class="card-text"><small class="text-muted">{{ cafe.address }}</small></p>
+                <p class="card-text"><small class="text-muted">{{ cafe.category_label if cafe.category_label else 'Mixed menu' }}</small></p>
+                <div class="home-rec-card__meta mb-3">
+                    <span>
+                        {% if cafe.average_rating %}
+                        <span class="rating-stars" aria-label="{{ cafe.average_rating }} out of 5 stars">
+                            {% for _ in range(cafe.star_count) %}<span class="rating-stars__star">★</span>{% endfor %}
+                        </span>
+                        <span class="rating-stars__value">{{ cafe.average_rating }}</span>
+                        {% else %}
+                        New
+                        {% endif %}
+                    </span>
+                    <span>{{ cafe.review_count }} review{% if cafe.review_count != 1 %}s{% endif %}</span>
+                    <span>{{ cafe.distance_km }} km away</span>
+                </div>
                 <a href="/cafes/{{ cafe.id }}?role={{ current_user.role }}" class="btn btn-primary">View Details</a>
             </div>
         </div>
@@ -31,4 +90,34 @@
 {% if not cafes %}
 <p>No cafés found.</p>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const cafeSearchInput = document.getElementById('search');
+const cafeCards = Array.from(document.querySelectorAll('[data-cafe-card]'));
+const cafeResultsCount = document.getElementById('cafe-results-count');
+
+if (cafeSearchInput && cafeCards.length && cafeResultsCount) {
+    const updateCafeMatches = () => {
+        const query = cafeSearchInput.value.trim().toLowerCase();
+        let visibleCount = 0;
+
+        cafeCards.forEach((card) => {
+            const haystack = [
+                card.dataset.name || '',
+                card.dataset.description || '',
+                card.dataset.address || '',
+            ].join(' ');
+            const matches = !query || haystack.includes(query);
+            card.classList.toggle('d-none', !matches);
+            if (matches) visibleCount += 1;
+        });
+
+        cafeResultsCount.textContent = `${visibleCount} cafe${visibleCount === 1 ? '' : 's'} found.`;
+    };
+
+    cafeSearchInput.addEventListener('input', updateCafeMatches);
+}
+</script>
 {% endblock %}

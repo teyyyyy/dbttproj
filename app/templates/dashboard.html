@@ -13,8 +13,8 @@
         </p>
         <div class="vendor-hero__stats">
             <div class="hero-stat">
-                <span class="hero-stat__value">{{ active_cafes }}</span>
-                <span class="hero-stat__label">Active stalls</span>
+                <span class="hero-stat__value">{{ managed_cafe.name if managed_cafe else "N/A" }}</span>
+                <span class="hero-stat__label">Managed cafe</span>
             </div>
             <div class="hero-stat">
                 <span class="hero-stat__value">{{ total_orders }}</span>
@@ -35,12 +35,12 @@
 </section>
 
 <section class="dashboard-grid">
-    <article class="dashboard-card metric-card">
+    <article class="dashboard-card metric-card metric-card--accent">
         <p class="metric-card__label">Orders today</p>
         <h2>{{ todays_orders }}</h2>
         <p class="metric-card__note">Live count of today's incoming business.</p>
     </article>
-    <article class="dashboard-card metric-card">
+    <article class="dashboard-card metric-card metric-card--warm">
         <p class="metric-card__label">Weekly revenue</p>
         <h2>${{ "%.2f"|format(weekly_revenue) }}</h2>
         <p class="metric-card__note">Revenue generated in the last 7 days.</p>
@@ -55,6 +55,21 @@
         <h2>{{ platform_bookings }}</h2>
         <p class="metric-card__note">{{ booking_completion_rate }}% completed or ready in the last 7 days.</p>
     </article>
+</section>
+
+<section class="dashboard-card dashboard-card--highlight">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Quick actions</p>
+            <h3>Jump straight into vendor tasks</h3>
+        </div>
+    </div>
+    <div class="vendor-actions">
+        {% if managed_cafe %}
+        <a href="/cafes/{{ managed_cafe.id }}/edit" class="vendor-action-btn vendor-action-btn--primary">Edit Menu</a>
+        {% endif %}
+        <a href="/orders" class="vendor-action-btn vendor-action-btn--primary">View Orders</a>
+    </div>
 </section>
 
 <section class="dashboard-grid dashboard-grid--split">
@@ -110,12 +125,7 @@
                 <span class="status-pill__label">Ready / done</span>
             </div>
         </div>
-        <div class="link-stack">
-            {% for cafe in cafes %}
-            <a href="/cafes/{{ cafe.id }}/edit" class="action-link">Manage menu for {{ cafe.name }}</a>
-            {% endfor %}
-            <a href="/orders" class="action-link">Open full vendor order list</a>
-        </div>
+        <p class="empty-state">Use the quick actions above to manage menu availability and review incoming orders faster.</p>
     </article>
 </section>
 
@@ -130,10 +140,10 @@
         {% if top_menu_items %}
         <div class="list-stack">
             {% for item in top_menu_items %}
-            <div class="list-row">
+            <div class="list-row popular-item-row popular-item-row--{{ loop.index }}">
                 <div>
                     <strong>{{ item.name }}</strong>
-                    <p>{{ item.category|capitalize }}{% if item.cafes %} • {{ item.cafes }}{% endif %}</p>
+                    <p>{{ item.category|capitalize }}{% if managed_cafe %} • {{ managed_cafe.name }}{% elif item.cafes %} • {{ item.cafes }}{% endif %}</p>
                 </div>
                 <div class="list-row__meta">
                     <span>{{ item.quantity_sold }} sold</span>
@@ -221,6 +231,50 @@
     <article class="dashboard-card">
         <div class="section-heading">
             <div>
+                <p class="eyebrow">Order timing</p>
+                <h3>Busiest hours</h3>
+            </div>
+        </div>
+        <div class="booking-chart">
+            {% set max_hour_count = hourly_order_data | map(attribute='count') | max if hourly_order_data else 0 %}
+            {% for hour in hourly_order_data %}
+            <div class="booking-chart__day">
+                <div class="booking-chart__bar-wrap">
+                    <div class="booking-chart__bar booking-chart__bar--sage" style="height: {{ 18 if hour.count == 0 else (hour.count / (max_hour_count if max_hour_count else 1) * 180 + 18) | round(0, 'ceil') }}px;"></div>
+                </div>
+                <strong>{{ hour.count }}</strong>
+                <span>{{ hour.label }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Weekday revenue</p>
+                <h3>Best days to sell</h3>
+            </div>
+        </div>
+        <div class="mini-chart">
+            {% set max_weekday_revenue = weekday_revenue_data | map(attribute='revenue') | max if weekday_revenue_data else 0 %}
+            {% for day in weekday_revenue_data %}
+            <div class="mini-chart__day">
+                <div class="mini-chart__bar-wrap">
+                    <div class="mini-chart__bar mini-chart__bar--amber" style="height: {{ 18 if day.revenue == 0 else (day.revenue / (max_weekday_revenue if max_weekday_revenue else 1) * 140 + 18) | round(0, 'ceil') }}px;"></div>
+                </div>
+                <strong>${{ "%.0f"|format(day.revenue) }}</strong>
+                <span>{{ day.label }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="dashboard-grid dashboard-grid--split">
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
                 <p class="eyebrow">Production planning</p>
                 <h3>Suggested prep quantities</h3>
             </div>
@@ -271,21 +325,23 @@
 <section class="dashboard-card">
     <div class="section-heading">
         <div>
-            <p class="eyebrow">Stall directory</p>
-            <h3>Your business locations</h3>
+            <p class="eyebrow">Business profile</p>
+            <h3>Your managed cafe</h3>
         </div>
     </div>
     <div class="stall-grid">
-        {% for cafe in cafes %}
+        {% if managed_cafe %}
         <article class="stall-card">
-            <h4>{{ cafe.name }}</h4>
-            <p>{{ cafe.description }}</p>
+            <h4>{{ managed_cafe.name }}</h4>
+            <p>{{ managed_cafe.description }}</p>
             <div class="stall-card__meta">
-                <span>{{ cafe.address }}</span>
-                <span>{{ cafe.operating_hours }}</span>
+                <span>{{ managed_cafe.address }}</span>
+                <span>{{ managed_cafe.operating_hours }}</span>
             </div>
         </article>
-        {% endfor %}
+        {% else %}
+        <p class="empty-state">Create your cafe profile to start managing menu items and orders.</p>
+        {% endif %}
     </div>
 </section>
 {% elif current_user.role == 'customer' %}
