@@ -2,6 +2,7 @@ from collections import Counter, defaultdict
 from calendar import monthrange
 from datetime import datetime, timedelta
 from math import asin, cos, radians, sin, sqrt
+import re
 from typing import Optional
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form
@@ -629,6 +630,32 @@ def get_managed_cafe_for_vendor(db: Session, vendor_id: int):
 def get_visible_cafes_for_user(db: Session, current_user: Optional[User]):
     return db.query(Cafe).all()
 
+
+def get_operating_hour_slots(operating_hours: Optional[str]) -> list[int]:
+    if not operating_hours:
+        return list(range(8, 21))
+
+    hour_matches = re.findall(r"(\d{1,2})(?::?(\d{2}))?\s*(am|pm)?", operating_hours, flags=re.IGNORECASE)
+    if len(hour_matches) < 2:
+        return list(range(8, 21))
+
+    def to_24_hour(hour_text: str, minute_text: str, meridiem: str) -> int:
+        hour = int(hour_text)
+        meridiem = meridiem.lower() if meridiem else ""
+        if meridiem == "pm" and hour != 12:
+            hour += 12
+        elif meridiem == "am" and hour == 12:
+            hour = 0
+        return hour
+
+    opening_hour = to_24_hour(*hour_matches[0])
+    closing_hour = to_24_hour(*hour_matches[1])
+
+    if closing_hour <= opening_hour:
+        return list(range(8, 21))
+
+    return list(range(opening_hour, closing_hour + 1))
+
 seed_data(SessionLocal())
 cleanup_duplicate_cafes(SessionLocal())
 cleanup_duplicate_cafes_by_name(SessionLocal())
@@ -1089,9 +1116,14 @@ async def dashboard(
         daily_booking_map = {}
         customer_summary = {}
         category_sales = defaultdict(lambda: {"label": "", "quantity": 0, "revenue": 0.0})
+        operating_hours = get_operating_hour_slots(managed_cafe.operating_hours if managed_cafe else None)
         hourly_order_map = {
-            hour: {"label": f"{hour:02d}:00", "count": 0}
-            for hour in range(8, 21, 2)
+            hour: {"label": f"{hour:02d}00", "count": 0}
+            for hour in operating_hours
+        }
+        hourly_revenue_map = {
+            hour: {"label": f"{hour:02d}00", "revenue": 0.0}
+            for hour in operating_hours
         }
         weekday_revenue_map = {
             index: {"label": label, "revenue": 0.0}
@@ -1118,9 +1150,11 @@ async def dashboard(
             if day_key in daily_revenue_map:
                 daily_revenue_map[day_key]["revenue"] += order.total_amount
                 daily_booking_map[day_key]["count"] += 1
-            order_hour_bucket = order.order_time.hour - (order.order_time.hour % 2)
+            order_hour_bucket = order.order_time.hour
             if order_hour_bucket in hourly_order_map:
                 hourly_order_map[order_hour_bucket]["count"] += 1
+            if order_hour_bucket in hourly_revenue_map:
+                hourly_revenue_map[order_hour_bucket]["revenue"] += order.total_amount
             weekday_revenue_map[order.order_time.weekday()]["revenue"] += order.total_amount
 
             customer = order.customer
@@ -1235,6 +1269,73 @@ async def dashboard(
             pie_segments.append(f"{entry['color']} {pie_offset:.2f}% {pie_offset + share:.2f}%")
             pie_offset += share
         category_pie_style = f"conic-gradient({', '.join(pie_segments)})" if pie_segments else ""
+        hourly_revenue_data = list(hourly_revenue_map.values())
+        max_hourly_revenue = max((entry["revenue"] for entry in hourly_revenue_data), default=0)
+        daily_revenue_scale_max = max(
+            1000,
+            int(((max_hourly_revenue + 199) // 200) * 200) if max_hourly_revenue else 1000,
+        )
+        daily_revenue_ticks = [
+            int(round(daily_revenue_scale_max - ((daily_revenue_scale_max / 5) * step)))
+            for step in range(6)
+        ]
+        hourly_revenue_points = []
+        for index, entry in enumerate(hourly_revenue_data):
+            x_position = round((index / (len(hourly_revenue_data) - 1)) * 100, 2) if len(hourly_revenue_data) > 1 else 50
+            y_position = (
+                round(10 + ((entry["revenue"] / daily_revenue_scale_max) * 78), 2)
+                if daily_revenue_scale_max
+                else 10
+            )
+            hourly_revenue_points.append(
+                {
+                    "label": entry["label"],
+                    "revenue": entry["revenue"],
+                    "x": x_position,
+                    "y": y_position,
+                    "svg_y": round(100 - y_position, 2),
+                }
+            )
+        hourly_revenue_polyline = " ".join(
+            f"{point['x']},{point['svg_y']}" for point in hourly_revenue_points
+        )
+        hourly_revenue_path = ""
+        if hourly_revenue_points:
+            starting_point = hourly_revenue_points[0]
+            hourly_revenue_path = f"M {starting_point['x']},{starting_point['svg_y']}"
+            for index in range(1, len(hourly_revenue_points)):
+                previous_point = hourly_revenue_points[index - 1]
+                current_point = hourly_revenue_points[index]
+                delta_x = current_point["x"] - previous_point["x"]
+                control_point_1_x = round(previous_point["x"] + (delta_x / 3), 2)
+                control_point_2_x = round(current_point["x"] - (delta_x / 3), 2)
+                hourly_revenue_path += (
+                    f" C {control_point_1_x},{previous_point['svg_y']}"
+                    f" {control_point_2_x},{current_point['svg_y']}"
+                    f" {current_point['x']},{current_point['svg_y']}"
+                )
+        hourly_revenue_segments = [
+            {
+                "x1": hourly_revenue_points[index]["x"],
+                "y1": hourly_revenue_points[index]["svg_y"],
+                "x2": hourly_revenue_points[index + 1]["x"],
+                "y2": hourly_revenue_points[index + 1]["svg_y"],
+            }
+            for index in range(len(hourly_revenue_points) - 1)
+        ]
+        peak_revenue_hour = max(hourly_revenue_data, key=lambda entry: entry["revenue"], default=None)
+        active_revenue_hours = [entry for entry in hourly_revenue_data if entry["revenue"] > 0]
+        daily_chart_summary = {
+            "total": round(sum(entry["revenue"] for entry in hourly_revenue_data), 2),
+            "peak_hour": peak_revenue_hour["label"] if peak_revenue_hour else "--",
+            "peak_value": round(peak_revenue_hour["revenue"], 2) if peak_revenue_hour else 0,
+            "active_hours": len(active_revenue_hours),
+            "average_active_hour": (
+                round(sum(entry["revenue"] for entry in active_revenue_hours) / len(active_revenue_hours), 2)
+                if active_revenue_hours
+                else 0
+            ),
+        }
         best_sales_day = max(daily_revenue_map.values(), key=lambda entry: entry["revenue"], default=None)
         best_booking_day = max(daily_booking_map.values(), key=lambda entry: entry["count"], default=None)
         busiest_hour = max(hourly_order_map.values(), key=lambda entry: entry["count"], default=None)
@@ -1285,6 +1386,14 @@ async def dashboard(
                 "weekly_sales_data": list(daily_revenue_map.values()),
                 "weekly_booking_data": list(daily_booking_map.values()),
                 "hourly_order_data": list(hourly_order_map.values()),
+                "hourly_revenue_data": hourly_revenue_data,
+                "hourly_revenue_points": hourly_revenue_points,
+                "hourly_revenue_polyline": hourly_revenue_polyline,
+                "hourly_revenue_path": hourly_revenue_path,
+                "hourly_revenue_segments": hourly_revenue_segments,
+                "daily_revenue_scale_max": daily_revenue_scale_max,
+                "daily_revenue_ticks": daily_revenue_ticks,
+                "daily_chart_summary": daily_chart_summary,
                 "weekday_revenue_data": list(weekday_revenue_map.values()),
                 "category_sales_data": category_sales_data,
                 "demand_forecast": demand_forecast,

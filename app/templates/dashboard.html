@@ -184,9 +184,9 @@
         <div class="section-heading">
             <div>
                 <p class="eyebrow">Sales trend</p>
-                <h3>{{ period_label }} sales trend</h3>
+                <h3>{% if selected_period == 'daily' %}Hourly revenue line graph{% else %}{{ period_label }} sales trend{% endif %}</h3>
             </div>
-            {% if selected_period != 'monthly' %}
+            {% if selected_period not in ['daily', 'monthly'] %}
             <div class="chart-toggle">
                 <button type="button" class="chart-toggle__link {% if chart_preferences.trend == 'bar' %}chart-toggle__link--active{% endif %}" data-chart-toggle="trend" data-chart-view="bar">Bar graph</button>
                 <button type="button" class="chart-toggle__link {% if chart_preferences.trend == 'histogram' %}chart-toggle__link--active{% endif %}" data-chart-toggle="trend" data-chart-view="histogram">Histogram</button>
@@ -196,7 +196,54 @@
         {% set max_sales_revenue = weekly_sales_data | map(attribute='revenue') | max if weekly_sales_data else 0 %}
         {% set min_sales_revenue = weekly_sales_data | map(attribute='revenue') | min if weekly_sales_data else 0 %}
         {% set sales_revenue_range = max_sales_revenue - min_sales_revenue %}
-        {% if selected_period == 'monthly' %}
+        {% if selected_period == 'daily' %}
+        <div class="scatter-chart scatter-chart--with-axis scatter-chart--daily">
+            <div class="scatter-chart__axis scatter-chart__axis--daily">
+                {% for tick in daily_revenue_ticks %}
+                <span>${{ "%.0f"|format(tick) }}</span>
+                {% endfor %}
+            </div>
+            <div class="scatter-chart__main">
+                <div class="scatter-chart__plot scatter-chart__plot--daily">
+                    <svg class="scatter-chart__line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                        <polyline points="{{ hourly_revenue_polyline }}" />
+                    </svg>
+                    {% for point in hourly_revenue_points %}
+                    <span
+                        class="scatter-chart__point scatter-chart__point--daily"
+                        title="{{ point.label }}: ${{ '%.0f'|format(point.revenue) }}"
+                        style="left: {{ point.x }}%; bottom: {{ point.y }}%;"
+                    ></span>
+                    {% endfor %}
+                </div>
+                <div class="scatter-chart__labels scatter-chart__labels--absolute">
+                    {% for point in hourly_revenue_points %}
+                    <span style="left: {{ point.x }}%;">{{ point.label }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <p class="metric-card__note">{{ managed_cafe.operating_hours if managed_cafe else "Operating hours" }} revenue pattern.</p>
+        <div class="daily-chart-summary">
+            <div class="daily-chart-summary__item">
+                <span class="daily-chart-summary__label">Today total</span>
+                <strong>${{ "%.0f"|format(daily_chart_summary.total) }}</strong>
+            </div>
+            <div class="daily-chart-summary__item">
+                <span class="daily-chart-summary__label">Peak hour</span>
+                <strong>{{ daily_chart_summary.peak_hour }}</strong>
+                <small>${{ "%.0f"|format(daily_chart_summary.peak_value) }}</small>
+            </div>
+            <div class="daily-chart-summary__item">
+                <span class="daily-chart-summary__label">Active hours</span>
+                <strong>{{ daily_chart_summary.active_hours }}</strong>
+            </div>
+            <div class="daily-chart-summary__item">
+                <span class="daily-chart-summary__label">Avg active hour</span>
+                <strong>${{ "%.0f"|format(daily_chart_summary.average_active_hour) }}</strong>
+            </div>
+        </div>
+        {% elif selected_period == 'monthly' %}
         {% set mid_sales_revenue = ((max_sales_revenue + min_sales_revenue) / 2) %}
         <div class="scatter-chart scatter-chart--with-axis">
             <div class="scatter-chart__axis">
