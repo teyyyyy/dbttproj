@@ -155,6 +155,9 @@
                 <li>{{ item.quantity }} x {{ item.menu_item.name }} @ ${{ "%.2f"|format(item.price) }}</li>
                 {% endfor %}
             </ul>
+            {% if current_user.role == 'customer' and order.status in ['ready', 'delivered'] %}
+            <button class="btn btn-outline-warning text-dark btn-sm mt-3 border bg-light shadow-sm review-prompt-btn" data-order-id="{{ order.id }}" data-cafe-name="{{ order.cafe.name }}">⭐ Leave a Review</button>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -226,4 +229,67 @@
     <a href="/cafes" class="btn btn-primary">Order More</a>
     {% endif %}
 </div>
+
+<!-- Review Modal Draft -->
+<div class="modal fade" id="reviewModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-light border-0">
+        <h5 class="modal-title fw-bold">Rate your experience</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>How was your experience picking up from <strong id="review-cafe-name"></strong>?</p>
+        <div class="mb-3">
+            <select class="form-select" id="review-rating">
+                <option value="5">⭐⭐⭐⭐⭐ Excellent!</option>
+                <option value="4">⭐⭐⭐⭐ Great</option>
+                <option value="3">⭐⭐⭐ Good</option>
+                <option value="2">⭐⭐ Fair</option>
+                <option value="1">⭐ Poor</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <textarea class="form-control" id="review-comment" rows="3" placeholder="Tell us what you liked about your order... (Optional)"></textarea>
+        </div>
+        <input type="hidden" id="review-order-id">
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Not Now</button>
+        <button type="button" class="btn btn-warning shadow-sm" onclick="submitReview()">Submit Review</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.review-prompt-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            promptReview(this.getAttribute('data-order-id'), this.getAttribute('data-cafe-name'));
+        });
+    });
+});
+
+function promptReview(orderId, cafeName) {
+    document.getElementById('review-order-id').value = orderId;
+    document.getElementById('review-cafe-name').textContent = cafeName;
+    new bootstrap.Modal(document.getElementById('reviewModal')).show();
+}
+
+function submitReview() {
+    const orderId = document.getElementById('review-order-id').value;
+    const rating = document.getElementById('review-rating').value;
+    const comment = document.getElementById('review-comment').value;
+    
+    fetch(`/api/orders/${orderId}/review`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ rating: parseInt(rating), comment: comment })
+    }).then(r => r.json()).then(data => {
+        alert("Thanks! Your review has been recorded.");
+        bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide();
+    }).catch(err => alert("Failed to submit review."));
+}
+</script>
 {% endblock %}
