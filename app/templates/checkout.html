@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout - Café Discovery{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <!-- Left Column: Order Summary & Points -->
+    <div class="col-md-6 mb-4">
+        <h3 class="fw-bold mb-4">Complete Your Order</h3>
+        
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="card-title fw-bold mb-3">Order Summary</h5>
+                <div id="checkout-items">
+                    <!-- Items injected by JS -->
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Subtotal</span>
+                    <span id="subtotal-display" class="fw-bold">$0.00</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2 text-success d-none" id="discount-row">
+                    <span>Points Discount</span>
+                    <span id="discount-display">-$0.00</span>
+                </div>
+                <div class="d-flex justify-content-between fs-5 fw-bold mt-3">
+                    <span>Total to Pay</span>
+                    <span id="total-display">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4 bg-light">
+            <div class="card-body">
+                <h5 class="fw-bold mb-2">Apply Shopback Points</h5>
+                <p class="small text-muted mb-3">You have <strong id="user-points">{{ points_balance }}</strong> points. (100 pts = $1 off)</p>
+                <div class="input-group">
+                    <input type="number" class="form-control" id="points-to-apply" placeholder="100" min="0" step="100" max="{{ points_balance }}">
+                    <button class="btn btn-outline-success" type="button" id="apply-points-btn">Apply</button>
+                </div>
+                <small id="points-error" class="text-danger d-none mt-2"></small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Payment Gateway Mockup -->
+    <div class="col-md-5">
+        <h4 class="fw-bold mb-4">Payment Method</h4>
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white">
+                <ul class="nav nav-pills card-header-pills" id="payment-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active rounded-pill px-4" id="card-tab" data-bs-toggle="pill" data-bs-target="#card-payment" type="button" role="tab">Credit Card</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link rounded-pill px-4" id="paynow-tab" data-bs-toggle="pill" data-bs-target="#paynow-payment" type="button" role="tab">PayNow</button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body text-center p-4">
+                <div class="tab-content">
+                    <!-- Credit Card Mockup -->
+                    <div class="tab-pane fade show active text-start" id="card-payment" role="tabpanel">
+                        <p class="text-muted mb-3 small">Secure payment via Stripe Simulation</p>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">Card Number</label>
+                            <input type="text" class="form-control" placeholder="4242 4242 4242 4242">
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label fw-bold small">Expiry</label>
+                                <input type="text" class="form-control" placeholder="MM/YY">
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label fw-bold small">CVC</label>
+                                <input type="text" class="form-control" placeholder="123">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PayNow Mockup -->
+                    <div class="tab-pane fade" id="paynow-payment" role="tabpanel">
+                        <p class="text-muted mb-2 small">Scan with your banking app</p>
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=PayNowPrototype" alt="PayNow QR" class="img-fluid mb-3 shadow-sm rounded">
+                        <br>
+                        <span class="badge bg-secondary mb-2">Simulated QR Code</span>
+                    </div>
+                </div>
+                
+                <hr class="my-4">
+                <button class="btn btn-primary w-100 rounded-pill fw-bold py-2 fs-5 shadow-sm" id="confirm-pay-btn">
+                    Pay <span id="btn-total-display">$0.00</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const cafeId = urlParams.get('cafe_id');
+    const pointsBalance = parseInt("{{ points_balance }}", 10) || 0;
+    
+    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    let subtotal = 0;
+    let pointsApplied = 0;
+    let discountAmount = 0;
+
+    // Filter cart visually to make sure it's valid, calculate total
+    const cartDiv = document.getElementById('checkout-items');
+    if (cart.length === 0) {
+        cartDiv.innerHTML = '<p class="text-muted">Your cart is empty.</p>';
+        document.getElementById('confirm-pay-btn').disabled = true;
+    } else {
+        cart.forEach(item => {
+            subtotal += item.price * item.quantity;
+            cartDiv.innerHTML += `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>${item.name} <span class="text-muted mx-1">x${item.quantity}</span></span>
+                    <strong>$${(item.price * item.quantity).toFixed(2)}</strong>
+                </div>
+            `;
+        });
+    }
+
+    function updateTotal() {
+        discountAmount = pointsApplied / 100;
+        let finalTotal = Math.max(0, subtotal - discountAmount);
+        
+        document.getElementById('subtotal-display').textContent = `$${subtotal.toFixed(2)}`;
+        document.getElementById('total-display').textContent = `$${finalTotal.toFixed(2)}`;
+        document.getElementById('btn-total-display').textContent = `$${finalTotal.toFixed(2)}`;
+
+        const discountRow = document.getElementById('discount-row');
+        if (discountAmount > 0) {
+            discountRow.classList.remove('d-none');
+            document.getElementById('discount-display').textContent = `-$${discountAmount.toFixed(2)}`;
+        } else {
+            discountRow.classList.add('d-none');
+        }
+    }
+    
+    updateTotal();
+
+    // Points Application
+    document.getElementById('apply-points-btn').addEventListener('click', () => {
+        const inputVal = parseInt(document.getElementById('points-to-apply').value, 10);
+        const errorMsg = document.getElementById('points-error');
+        errorMsg.classList.add('d-none');
+
+        if (isNaN(inputVal) || inputVal < 0 || inputVal % 100 !== 0) {
+            errorMsg.textContent = "Points must be a multiple of 100.";
+            errorMsg.classList.remove('d-none');
+            return;
+        }
+        if (inputVal > pointsBalance) {
+            errorMsg.textContent = "You don't have enough points.";
+            errorMsg.classList.remove('d-none');
+            return;
+        }
+        
+        // Prevent applying more points than the subtotal
+        const maxPointsUseful = Math.ceil(subtotal) * 100;
+        if (inputVal > maxPointsUseful) {
+            pointsApplied = maxPointsUseful;
+            document.getElementById('points-to-apply').value = maxPointsUseful;
+        } else {
+            pointsApplied = inputVal;
+        }
+
+        updateTotal();
+    });
+
+    // Payment Submission
+    document.getElementById('confirm-pay-btn').addEventListener('click', () => {
+        const btn = document.getElementById('confirm-pay-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+
+        // Fake network delay for simulated payment
+        setTimeout(() => {
+            fetch('/checkout', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    cafe_id: parseInt(cafeId), 
+                    items: cart.map(item => ({id: parseInt(item.id), quantity: item.quantity})),
+                    points_applied: pointsApplied,
+                    delivery_address: 'Home Address (Mocked)'
+                })
+            }).then(r => r.json()).then(data => {
+                if(data.order_id) {
+                    localStorage.setItem('cart', '[]'); // Clear cart
+                    window.location.href = `/orders/${data.order_id}/confirmation`;
+                } else {
+                    alert('Error placing order');
+                    btn.disabled = false;
+                    btn.textContent = 'Pay Again';
+                }
+            }).catch(err => {
+                console.error(err);
+                alert("Payment simulation failed.");
+                btn.disabled = false;
+                btn.textContent = 'Pay Again';
+            });
+        }, 1500);
+    });
+</script>
+{% endblock %}

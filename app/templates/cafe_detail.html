@@ -5,8 +5,15 @@
 {% block content %}
 <div class="row">
     <div class="col-md-8">
-        <div class="mb-3">
+        <div class="mb-3 d-flex justify-content-between align-items-center">
             <a href="/cafes" class="btn btn-outline-secondary">Back to Cafes</a>
+            {% if current_user and current_user.role == 'customer' %}
+            <button
+                class="btn {% if is_favorited %}btn-danger text-white{% else %}btn-outline-danger{% endif %} rounded-pill px-4 shadow-sm"
+                onclick="toggleFavorite('{{ cafe.id }}', this)">
+                {% if is_favorited %}❤️ Favorited{% else %}🤍 Favorite Shop{% endif %}
+            </button>
+            {% endif %}
         </div>
         <h1>{{ cafe.name }}</h1>
         <p>{{ cafe.description }}</p>
@@ -14,7 +21,8 @@
         <p><strong>Operating Hours:</strong> {{ cafe.operating_hours }}</p>
         <div class="mb-3">
             <h5>Location Map</h5>
-            <img src="https://via.placeholder.com/400x300/cccccc/000000?text=Map+of+{{ cafe.name | urlencode }}" alt="Map" class="img-fluid">
+            <img src="https://via.placeholder.com/400x300/cccccc/000000?text=Map+of+{{ cafe.name | urlencode }}"
+                alt="Map" class="img-fluid">
         </div>
 
         <h2>Menu</h2>
@@ -28,7 +36,8 @@
                 {% for item in items %}
                 <div class="col-md-6">
                     <div class="card menu-item-card">
-                        <img src="{{ menu_item_image_url(item.name, item.category) }}" class="card-img-top menu-item-card__image" alt="{{ item.name }}">
+                        <img src="{{ menu_item_image_url(item.name, item.category) }}"
+                            class="card-img-top menu-item-card__image" alt="{{ item.name }}">
                         <div class="card-body">
                             <div class="menu-item-card__top">
                                 <h5 class="card-title">{{ item.name }}</h5>
@@ -41,7 +50,8 @@
                             <p class="card-text">{{ item.description }}</p>
                             <p class="card-text"><strong>${{ "%.2f"|format(item.price) }}</strong></p>
                             {% if current_user and current_user.role == 'customer' and item.is_available %}
-                            <button class="btn btn-success add-to-cart" data-item-id="{{ item.id }}">Add to Cart</button>
+                            <button class="btn btn-success add-to-cart" data-item-id="{{ item.id }}">Add to
+                                Cart</button>
                             {% endif %}
                         </div>
                     </div>
@@ -93,63 +103,47 @@
 </div>
 
 <script>
-var cafeId = {{ cafe.id }};
-let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    var cafeId = parseInt("{{ cafe.id }}", 10);
+    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 
-document.querySelectorAll('.add-to-cart').forEach(button => {
-    button.addEventListener('click', function() {
-        const itemId = this.dataset.itemId;
-        const itemName = this.previousElementSibling.previousElementSibling.textContent;
-        const itemPrice = parseFloat(this.previousElementSibling.textContent.replace('$', ''));
-        
-        cart.push({id: itemId, name: itemName, price: itemPrice, quantity: 1});
-        updateCart();
-    });
-});
+    document.querySelectorAll('.add-to-cart').forEach(button => {
+        button.addEventListener('click', function () {
+            const itemId = this.dataset.itemId;
+            const itemName = this.previousElementSibling.previousElementSibling.textContent;
+            const itemPrice = parseFloat(this.previousElementSibling.textContent.replace('$', ''));
 
-function updateCart() {
-    const cartDiv = document.getElementById('cart-items');
-    cartDiv.innerHTML = '';
-    let total = 0;
-    cart.forEach((item, index) => {
-        total += item.price * item.quantity;
-        cartDiv.innerHTML += `<p>${item.name} x${item.quantity} - $${(item.price * item.quantity).toFixed(2)} <button class="btn btn-sm btn-danger" onclick="removeFromCart(${index})">Remove</button></p>`;
-    });
-    cartDiv.innerHTML += `<p><strong>Total: $${total.toFixed(2)}</strong></p>`;
-    localStorage.setItem('cart', JSON.stringify(cart));
-}
-
-function removeFromCart(index) {
-    cart.splice(index, 1);
-    updateCart();
-}
-
-const placeOrderButton = document.getElementById('place-order');
-if (placeOrderButton) {
-    updateCart();
-    placeOrderButton.addEventListener('click', function() {
-        if (cart.length === 0) {
-            alert('Cart is empty!');
-            return;
-        }
-        // Simulate payment
-        alert('Simulating payment... Please enter payment details.');
-        // For demo, assume payment success
-        fetch('/checkout', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({cafe_id: cafeId, items: cart.map(item => ({id: parseInt(item.id), quantity: item.quantity})), delivery_address: 'Default Address'})
-        }).then(response => response.json()).then(data => {
-            alert('Order placed!');
-            cart = [];
-            localStorage.setItem('cart', JSON.stringify(cart));
+            cart.push({ id: itemId, name: itemName, price: itemPrice, quantity: 1 });
             updateCart();
-            window.location.href = '/orders';
-        }).catch(err => {
-            alert('Error placing order');
-            console.error(err);
         });
     });
-}
+
+    function updateCart() {
+        const cartDiv = document.getElementById('cart-items');
+        cartDiv.innerHTML = '';
+        let total = 0;
+        cart.forEach((item, index) => {
+            total += item.price * item.quantity;
+            cartDiv.innerHTML += `<p>${item.name} x${item.quantity} - $${(item.price * item.quantity).toFixed(2)} <button class="btn btn-sm btn-danger" onclick="removeFromCart(${index})">Remove</button></p>`;
+        });
+        cartDiv.innerHTML += `<p><strong>Total: $${total.toFixed(2)}</strong></p>`;
+        localStorage.setItem('cart', JSON.stringify(cart));
+    }
+
+    function removeFromCart(index) {
+        cart.splice(index, 1);
+        updateCart();
+    }
+
+    const placeOrderButton = document.getElementById('place-order');
+    if (placeOrderButton) {
+        updateCart();
+        placeOrderButton.addEventListener('click', function () {
+            if (cart.length === 0) {
+                alert('Cart is empty!');
+                return;
+            }
+            window.location.href = `/checkout?cafe_id=${cafeId}`;
+        });
+    }
 </script>
 {% endblock %}

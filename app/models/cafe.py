@@ -18,3 +18,4 @@ class Cafe(Base):
     vendor = relationship("User")
     menu_items = relationship("MenuItem", back_populates="cafe")
     orders = relationship("Order", back_populates="cafe")
+    favorited_by = relationship("Favorite", backref="cafe", cascade="all, delete-orphan")

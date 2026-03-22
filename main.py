@@ -14,7 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from app.routes import auth, cafes, orders, admin
 from app.utils.database import engine, Base, get_db, SessionLocal
-from app.models import User, Cafe, MenuItem, Order, OrderItem, Point, Review
+from app.models import User, Cafe, MenuItem, Order, OrderItem, Point, Review, Favorite
 from app.utils.auth import get_current_user
 
 # Create database tables
@@ -980,9 +980,14 @@ async def cafe_detail(request: Request, cafe_id: int, db: Session = Depends(get_
     reviews = db.query(Review).filter(Review.cafe_id == cafe_id).all()
     managed_cafe = None
     can_manage_cafe = False
-    if current_user and current_user.role == "vendor":
-        managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
-        can_manage_cafe = bool(managed_cafe and managed_cafe.id == cafe.id)
+    is_favorited = False
+    if current_user:
+        if current_user.role == "vendor":
+            managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
+            can_manage_cafe = bool(managed_cafe and managed_cafe.id == cafe.id)
+        else:
+            is_favorited = db.query(Favorite).filter(Favorite.user_id == current_user.id, Favorite.cafe_id == cafe.id).first() is not None
+
     return templates.TemplateResponse(
         "cafe_detail.html",
         {
@@ -994,6 +999,7 @@ async def cafe_detail(request: Request, cafe_id: int, db: Session = Depends(get_
             "current_user": current_user,
             "managed_cafe": managed_cafe,
             "can_manage_cafe": can_manage_cafe,
+            "is_favorited": is_favorited,
         },
     )
 
@@ -1585,12 +1591,20 @@ async def user_orders(
         },
     )
 
+@app.get("/checkout", response_class=HTMLResponse)
+async def checkout_page(request: Request, cafe_id: int, current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+    points_balance = db.query(func.sum(Point.amount)).filter(Point.user_id == current_user.id).scalar() or 0
+    return templates.TemplateResponse("checkout.html", {"request": request, "current_user": current_user, "points_balance": points_balance})
+
 @app.post("/checkout")
 async def checkout(request: Request, current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
     data = await request.json()
     cafe_id = data['cafe_id']
     items = data['items']  # list of {id: menu_item_id, quantity}
     delivery_address = data.get('delivery_address', 'Default Address')
+    points_applied = data.get('points_applied', 0)
     
     total = 0.0
     order_items = []
@@ -1602,21 +1616,65 @@ async def checkout(request: Request, current_user: User = Depends(get_current_us
         total += price * item['quantity']
         order_items.append(OrderItem(menu_item_id=item['id'], quantity=item['quantity'], price=price))
     
-    order = Order(customer_id=current_user.id, cafe_id=cafe_id, total_amount=total, delivery_address=delivery_address)
+    # Apply points discount
+    discount = points_applied / 100.0
+    final_total = max(0, total - discount)
+
+    order = Order(customer_id=current_user.id, cafe_id=cafe_id, total_amount=final_total, delivery_address=delivery_address)
     db.add(order)
     db.flush()
     for oi in order_items:
         oi.order_id = order.id
         db.add(oi)
     
-    # Award points: $1 = 1 point
-    points_earned = int(total)
+    # Deduct applied points
+    if points_applied > 0:
+        point_deduction = Point(user_id=current_user.id, amount=-points_applied, transaction_type="redeem", description=f"Applied to order #{order.id}")
+        db.add(point_deduction)
+
+    # Award points: $1 = 1 point (based on final_total paid)
+    points_earned = int(final_total)
     if points_earned > 0:
         point = Point(user_id=current_user.id, amount=points_earned, transaction_type="earn", description=f"Earned from order #{order.id}")
         db.add(point)
     
     db.commit()
     return {"message": "Order placed", "order_id": order.id}
+
+@app.get("/orders/{order_id}/confirmation", response_class=HTMLResponse)
+async def order_confirmation(request: Request, order_id: int, current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+    order = db.query(Order).options(joinedload(Order.cafe), joinedload(Order.items).joinedload(OrderItem.menu_item)).filter(Order.id == order_id, Order.customer_id == current_user.id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return templates.TemplateResponse("confirmation.html", {"request": request, "current_user": current_user, "order": order})
+
+from pydantic import BaseModel
+from typing import Optional
+
+class ReviewCreate(BaseModel):
+    rating: int
+    comment: Optional[str] = None
+
+@app.post("/api/orders/{order_id}/review")
+async def create_review(order_id: int, review_in: ReviewCreate, current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    order = db.query(Order).filter(Order.id == order_id, Order.customer_id == current_user.id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    # For this prototype we will note it on the order notes.
+    if order.notes:
+        order.notes += f"\nReview: {review_in.rating}/5 - {review_in.comment}"
+    else:
+        order.notes = f"Review: {review_in.rating}/5 - {review_in.comment}"
+    db.commit()
+    
+    return {"status": "success", "message": "Review added"}
+
 
 @app.post("/redeem")
 async def redeem(points: int = Form(...), current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
@@ -1630,7 +1688,8 @@ async def redeem(points: int = Form(...), current_user: User = Depends(get_curre
     point = Point(user_id=current_user.id, amount=-points, transaction_type="redeem", description=f"Redeemed {points} points for ${points // 20} voucher")
     db.add(point)
     db.commit()
-    return RedirectResponse(url="/loyalty", status_code=302)  # Redirect to loyalty instead
+    return RedirectResponse(url="/account", status_code=302)  # Redirect to account instead
+
 
 @app.get("/loyalty", response_class=HTMLResponse)
 async def loyalty(request: Request, current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
@@ -1640,6 +1699,43 @@ async def loyalty(request: Request, current_user: User = Depends(get_current_use
     points_balance = sum(p.amount for p in points)
     return templates.TemplateResponse("loyalty.html", {"request": request, "points": points, "points_balance": points_balance, "current_user": current_user})
 
+@app.get("/account", response_class=HTMLResponse)
+async def account_page(request: Request, current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    if not current_user or current_user.role != 'customer':
+        return RedirectResponse(url="/login", status_code=302)
+
+    points = db.query(Point).filter(Point.user_id == current_user.id).order_by(Point.created_at.desc()).all()
+    points_balance = sum(p.amount for p in points)
+
+    recent_orders = (
+        db.query(Order)
+        .options(joinedload(Order.cafe))
+        .filter(Order.customer_id == current_user.id)
+        .order_by(Order.order_time.desc())
+        .limit(5)
+        .all()
+    )
+
+    favorites = (
+        db.query(Favorite)
+        .options(joinedload(Favorite.cafe))
+        .filter(Favorite.user_id == current_user.id)
+        .order_by(Favorite.created_at.desc())
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "account.html",
+        {
+            "request": request,
+            "current_user": current_user,
+            "points": points,
+            "points_balance": points_balance,
+            "orders": recent_orders,
+            "favorites": favorites
+        }
+    )
+
 @app.get("/logout", response_class=HTMLResponse)
 async def logout():
     # Clear the role cookie
@@ -1647,3 +1743,75 @@ async def logout():
     response.delete_cookie("role")
     response.delete_cookie("access_token")
     return response
+
+@app.get("/api/users/me/sidebar")
+async def get_sidebar_data(
+    current_user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        return {"orders": [], "favorites": []}
+
+    # Recent orders
+    recent_orders = (
+        db.query(Order)
+        .options(joinedload(Order.cafe))
+        .filter(Order.customer_id == current_user.id)
+        .order_by(Order.order_time.desc())
+        .limit(3)
+        .all()
+    )
+    
+    orders_data = []
+    for o in recent_orders:
+        orders_data.append({
+            "id": o.id,
+            "cafe_name": o.cafe.name if o.cafe else "Unknown",
+            "total_amount": o.total_amount,
+            "status": o.status,
+            "date": o.order_time.strftime("%d %b %Y") if o.order_time else ""
+        })
+
+    # Favorites
+    favorites = (
+        db.query(Favorite)
+        .options(joinedload(Favorite.cafe))
+        .filter(Favorite.user_id == current_user.id)
+        .order_by(Favorite.created_at.desc())
+        .all()
+    )
+
+    favorites_data = [{"cafe_id": f.cafe.id, "cafe_name": f.cafe.name} for f in favorites if f.cafe]
+
+    return {"orders": orders_data, "favorites": favorites_data}
+
+@app.post("/api/cafes/{cafe_id}/favorite")
+async def favorite_cafe(
+    cafe_id: int,
+    current_user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not logged in")
+    
+    existing = db.query(Favorite).filter(Favorite.user_id == current_user.id, Favorite.cafe_id == cafe_id).first()
+    if not existing:
+        fav = Favorite(user_id=current_user.id, cafe_id=cafe_id)
+        db.add(fav)
+        db.commit()
+    return {"status": "success"}
+
+@app.delete("/api/cafes/{cafe_id}/favorite")
+async def unfavorite_cafe(
+    cafe_id: int,
+    current_user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not logged in")
+    
+    existing = db.query(Favorite).filter(Favorite.user_id == current_user.id, Favorite.cafe_id == cafe_id).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+    return {"status": "success"}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}My Account - Café Discovery{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 mb-4">
+        <h2>Welcome, {{ current_user.full_name }}</h2>
+        <p class="text-muted">{{ current_user.email }}</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Points & Rewards Column -->
+    <div class="col-md-5 mb-4">
+        <div class="card shadow-sm border-0 h-100 bg-light">
+            <div class="card-body">
+                <h4 class="card-title text-success fw-bold">Shopback Points</h4>
+                <div class="display-4 text-dark mb-2">{{ points_balance }}</div>
+                <p class="text-muted small">$1 spent = 1 point. 100 points = $5 off voucher.</p>
+                <form method="post" action="/redeem" class="mt-4">
+                    <label for="points" class="form-label fw-bold">Redeem Points (Multiple of 100):</label>
+                    <div class="input-group mb-3">
+                        <input type="number" class="form-control" id="points" name="points" min="100" step="100" required>
+                        <button type="submit" class="btn btn-success">Redeem Voucher</button>
+                    </div>
+                </form>
+
+                <hr class="my-4">
+                <h5 class="fw-bold">Points History</h5>
+                {% if points %}
+                <ul class="list-group list-group-flush bg-transparent">
+                    {% for point in points[:5] %}
+                    <li class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
+                        <small>{{ point.description }}</small>
+                        <span class="badge {% if point.amount > 0 %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">
+                            {% if point.amount > 0 %}+{% endif %}{{ point.amount }}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if points|length > 5 %}<small class="text-muted d-block mt-2">Showing recent 5 transactions.</small>{% endif %}
+                {% else %}
+                <p class="text-muted small">No points history yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Favorites & Orders Column -->
+    <div class="col-md-7">
+        <!-- Favorites -->
+        <h4 class="fw-bold mb-3">Favorited Shops <span class="badge bg-danger rounded-pill fs-6">❤️</span></h4>
+        <div class="row mb-5">
+            {% if favorites %}
+                {% for fav in favorites %}
+                <div class="col-sm-6 mb-3">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body p-3 text-center">
+                            <h5 class="card-title mb-2">{{ fav.cafe.name }}</h5>
+                            <a href="/cafes/{{ fav.cafe.id }}" class="btn btn-outline-danger btn-sm rounded-pill w-100">Visit Shop</a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-12"><p class="text-muted">You haven't favorited any shops yet.</p></div>
+            {% endif %}
+        </div>
+
+        <!-- Recent Orders -->
+        <h4 class="fw-bold mb-3">Recent Orders <span class="badge bg-primary rounded-pill fs-6">📦</span></h4>
+        {% if orders %}
+        <div class="list-group shadow-sm mb-4">
+            {% for order in orders %}
+            <div class="list-group-item list-group-item-action p-3 border-0">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">{{ order.cafe.name }}</h6>
+                    <small class="text-muted">{{ order.order_time.strftime('%d %b %Y') if order.order_time else 'Unknown' }}</small>
+                </div>
+                <p class="mb-1 text-muted small">Total: <strong>${{ "%.2f"|format(order.total_amount) }}</strong></p>
+                <span class="badge bg-secondary">{{ order.status|capitalize }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <a href="/orders" class="btn btn-outline-secondary btn-sm">View All Orders</a>
+        {% else %}
+        <p class="text-muted">No recent orders found.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
