@@ -907,16 +907,7 @@ if (savedScroll !== null) {
     });
 }
 
-// CRM preview / expand behaviour
-const crmPreview = document.getElementById("crm-preview");
-const crmToggleBtn = document.getElementById("crm-toggle-btn");
-if (crmPreview && crmToggleBtn) {
-    crmToggleBtn.addEventListener("click", () => {
-        const expanded = crmPreview.classList.toggle("expanded");
-        crmToggleBtn.textContent = expanded ? "Collapse CRM list" : "View full CRM";
-        crmToggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
-    });
-}
+
 </script>
 {% elif current_user.role == 'customer' %}
 <div class="row">

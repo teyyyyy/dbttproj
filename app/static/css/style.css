@@ -153,6 +153,10 @@ footer {
     padding-top: 0.8rem;
 }
 
+.customer-row-with-badge .list-row__meta {
+    margin-top: 1.5rem;
+}
+
 .customer-row-badge {
     position: absolute;
     top: 0.4rem;
