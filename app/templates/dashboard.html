@@ -13,17 +13,24 @@
         </p>
         <div class="vendor-hero__stats">
             <div class="hero-stat">
-                <span class="hero-stat__value">{{ managed_cafe.name if managed_cafe else "N/A" }}</span>
-                <span class="hero-stat__label">Managed cafe</span>
-            </div>
-            <div class="hero-stat">
-                <span class="hero-stat__value">{{ total_orders }}</span>
+                <span id="total-orders-counter" class="hero-stat__value animated-counter" data-target="{{ total_orders }}">0</span>
                 <span class="hero-stat__label">Total orders</span>
             </div>
             <div class="hero-stat">
-                <span class="hero-stat__value">${{ "%.2f"|format(average_order_value) }}</span>
-                <span class="hero-stat__label">Average basket</span>
+                <span id="new-customers-counter" class="hero-stat__value animated-counter" data-target="{{ new_customers }}">{{ new_customers if new_customers else '-' }}</span>
+                <span class="hero-stat__label">New customers</span>
             </div>
+            <div class="hero-stat">
+                <span id="avg-customer-spend-counter" class="hero-stat__value animated-counter" data-target="{{ "%.2f"|format(avg_customer_spend) }}">$0.00</span>
+                <span class="hero-stat__label">Avg spend/customer</span>
+            </div>
+        </div>
+
+        <div class="vendor-hero__business">
+            <p class="eyebrow">Business profile</p>
+            <h2>{{ managed_cafe.name if managed_cafe else "No managed cafe set" }}</h2>
+            <p class="vendor-hero__business-text">{{ managed_cafe.description if managed_cafe and managed_cafe.description else "Add your cafe description in settings." }}</p>
+            <p class="vendor-hero__business-meta">{{ managed_cafe.address if managed_cafe and managed_cafe.address else "Address not available" }} • {{ managed_cafe.operating_hours if managed_cafe and managed_cafe.operating_hours else "Hours not configured" }}</p>
         </div>
     </div>
     <div class="vendor-hero__panel">
@@ -37,24 +44,61 @@
 <section class="dashboard-grid">
     <article class="dashboard-card metric-card metric-card--accent">
         <p class="metric-card__label">Orders today</p>
-        <h2>{{ todays_orders }}</h2>
+        <h2><span id="orders-counter" class="animated-counter" data-target="{{ todays_orders }}">0</span></h2>
         <p class="metric-card__note">Live count of today's incoming business.</p>
     </article>
     <article class="dashboard-card metric-card metric-card--warm">
         <p class="metric-card__label">{{ period_label }} revenue</p>
-        <h2>${{ "%.2f"|format(weekly_revenue) }}</h2>
+        <h2><span id="revenue-counter" class="animated-counter" data-target="{{ "%.2f"|format(period_revenue) }}">$0.00</span></h2>
         <p class="metric-card__note">Revenue generated in the {{ period_note }}.</p>
     </article>
     <article class="dashboard-card metric-card">
         <p class="metric-card__label">Customers reached</p>
-        <h2>{{ customers|length }}</h2>
+        <h2><span id="customers-counter" class="animated-counter" data-target="{{ customers|length }}">0</span></h2>
         <p class="metric-card__note">Unique customers identified for CRM follow-up in the {{ period_note }}.</p>
     </article>
     <article class="dashboard-card metric-card">
         <p class="metric-card__label">Bookings via platform</p>
-        <h2>{{ platform_bookings }}</h2>
+        <h2><span id="platform-bookings-counter" class="animated-counter" data-target="{{ platform_bookings }}">0</span></h2>
         <p class="metric-card__note">{{ booking_completion_rate }}% completed or ready in the {{ period_note }}.</p>
     </article>
+</section>
+
+<section class="dashboard-grid dashboard-grid--single">
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">CRM</p>
+                <h3>Customer relationships</h3>
+            </div>
+        </div>
+        {% if customers %}
+        <div class="crm-preview" id="crm-preview">
+            <div class="list-stack" id="crm-list-stack">
+                {% for customer in customers %}
+                <div class="list-row customer-row-with-badge">
+                    <div>
+                        <strong>{{ customer.full_name }}</strong>
+                        <p>{{ customer.email }}</p>
+                    </div>
+                    <div class="customer-row-badge tier-{{ customer.tier|lower }}">{{ customer.tier }}</div>
+                    <div class="list-row__meta">
+                        <span>{{ customer.order_count }} orders</span>
+                        <span>${{ "%.2f"|format(customer.total_spent) }} spent</span>
+                        <span>Last order: {{ customer.last_order_time.strftime('%Y-%m-%d') if customer.last_order_time else 'N/A' }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if customers|length > 3 %}
+            <button id="crm-toggle-btn" class="crm-toggle-btn" aria-expanded="false">View full CRM</button>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="empty-state">Customer profiles will appear here as soon as orders start coming in.</p>
+        {% endif %}
+    </article>
+
 </section>
 
 <section class="dashboard-card dashboard-card--highlight">
@@ -91,63 +135,6 @@
         {% endif %}
         <a href="/orders" class="vendor-action-btn vendor-action-btn--primary">View Orders</a>
     </div>
-</section>
-
-<section class="dashboard-grid {% if selected_period == 'monthly' %}dashboard-grid--single{% else %}dashboard-grid--split{% endif %}">
-    <article class="dashboard-card">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">CRM</p>
-                <h3>Customer relationships</h3>
-            </div>
-        </div>
-        {% if customers %}
-        <div class="list-stack">
-            {% for customer in customers %}
-            <div class="list-row">
-                <div>
-                    <strong>{{ customer.full_name }}</strong>
-                    <p>{{ customer.email }}</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>{{ customer.order_count }} orders</span>
-                    <span>${{ "%.2f"|format(customer.total_spent) }} spent</span>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="empty-state">Customer profiles will appear here as soon as orders start coming in.</p>
-        {% endif %}
-    </article>
-
-    <article class="dashboard-card">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Operations</p>
-                <h3>Fulfilment overview</h3>
-            </div>
-        </div>
-        <div class="status-grid">
-            <div class="status-pill">
-                <span class="status-pill__count">{{ status_counts.get('pending', 0) }}</span>
-                <span class="status-pill__label">Pending</span>
-            </div>
-            <div class="status-pill">
-                <span class="status-pill__count">{{ status_counts.get('confirmed', 0) }}</span>
-                <span class="status-pill__label">Confirmed</span>
-            </div>
-            <div class="status-pill">
-                <span class="status-pill__count">{{ status_counts.get('preparing', 0) }}</span>
-                <span class="status-pill__label">Preparing</span>
-            </div>
-            <div class="status-pill">
-                <span class="status-pill__count">{{ status_counts.get('ready', 0) + status_counts.get('delivered', 0) }}</span>
-                <span class="status-pill__label">Ready / done</span>
-            </div>
-        </div>
-        <p class="empty-state">Use the quick actions above to manage menu availability and review incoming orders faster.</p>
-    </article>
 </section>
 
 <section class="dashboard-grid {% if selected_period == 'monthly' %}dashboard-grid--single{% else %}dashboard-grid--split{% endif %}">
@@ -729,31 +716,135 @@
     </article>
 </section>
 
-<section class="dashboard-card">
-    <div class="section-heading">
-        <div>
-            <p class="eyebrow">Business profile</p>
-            <h3>Your managed cafe</h3>
-        </div>
-    </div>
-    <div class="stall-grid">
-        {% if managed_cafe %}
-        <article class="stall-card">
-            <h4>{{ managed_cafe.name }}</h4>
-            <p>{{ managed_cafe.description }}</p>
-            <div class="stall-card__meta">
-                <span>{{ managed_cafe.address }}</span>
-                <span>{{ managed_cafe.operating_hours }}</span>
-            </div>
-        </article>
-        {% else %}
-        <p class="empty-state">Create your cafe profile to start managing menu items and orders.</p>
-        {% endif %}
-    </div>
-</section>
+
 <script>
+function animateCounter(element, targetValue, options = {}) {
+    const { duration = 1300, isCurrency = false } = options;
+    const startValue = 0;
+    const startTime = performance.now();
+
+    function formatValue(value) {
+        if (isCurrency) {
+            return `$${value.toFixed(2)}`;
+        }
+        return Math.round(value).toLocaleString();
+    }
+
+    function pulseCounter() {
+        element.classList.add("popped");
+        if (["total-orders-counter", "avg-customer-spend-counter", "new-customers-counter"].includes(element.id)) {
+            element.classList.add("yellow");
+        }
+        setTimeout(() => element.classList.remove("popped"), 650);
+    }
+
+    function tick(now) {
+        const elapsed = Math.min(duration, now - startTime);
+        const progress = elapsed / duration;
+        const current = startValue + (targetValue - startValue) * (-Math.pow(2, -10 * progress) + 1);
+        element.textContent = isCurrency ? `$${current.toFixed(2)}` : Math.round(current).toLocaleString();
+        element.classList.add("animated");
+
+        if (elapsed < duration) {
+            requestAnimationFrame(tick);
+        } else {
+            element.textContent = formatValue(targetValue);
+            element.classList.remove("animated");
+            pulseCounter();
+        }
+    }
+
+    requestAnimationFrame(tick);
+}
+
+function initDashboardCounters() {
+    const revenueCounter = document.getElementById("revenue-counter");
+    if (revenueCounter) {
+        const target = parseFloat(revenueCounter.dataset.target || "0");
+        if (!Number.isNaN(target)) {
+            animateCounter(revenueCounter, target, { duration: 1400, isCurrency: true });
+        }
+    }
+
+    const ordersCounter = document.getElementById("orders-counter");
+    if (ordersCounter) {
+        const target = parseInt(ordersCounter.dataset.target || "0", 10);
+        if (!Number.isNaN(target)) {
+            animateCounter(ordersCounter, target, { duration: 1200, isCurrency: false });
+        }
+    }
+
+    const customersCounter = document.getElementById("customers-counter");
+    if (customersCounter) {
+        const target = parseInt(customersCounter.dataset.target || "0", 10);
+        if (!Number.isNaN(target)) {
+            animateCounter(customersCounter, target, { duration: 1200, isCurrency: false });
+        }
+    }
+
+    const platformBookingsCounter = document.getElementById("platform-bookings-counter");
+    if (platformBookingsCounter) {
+        const target = parseInt(platformBookingsCounter.dataset.target || "0", 10);
+        if (!Number.isNaN(target)) {
+            animateCounter(platformBookingsCounter, target, { duration: 1200, isCurrency: false });
+        }
+    }
+
+    const totalOrdersCounter = document.getElementById("total-orders-counter");
+    if (totalOrdersCounter) {
+        const target = parseInt(totalOrdersCounter.dataset.target || "0", 10);
+        if (!Number.isNaN(target)) {
+            animateCounter(totalOrdersCounter, target, { duration: 1300, isCurrency: false });
+        }
+    }
+
+    const newCustomersCounter = document.getElementById("new-customers-counter");
+    if (newCustomersCounter) {
+        const targetRaw = newCustomersCounter.dataset.target || "0";
+        const target = parseInt(targetRaw, 10);
+        if (!Number.isNaN(target) && target > 0) {
+            animateCounter(newCustomersCounter, target, { duration: 1300, isCurrency: false });
+        } else {
+            newCustomersCounter.textContent = "-";
+        }
+    }
+
+    const avgCustomerSpendCounter = document.getElementById("avg-customer-spend-counter");
+    if (avgCustomerSpendCounter) {
+        const target = parseFloat(avgCustomerSpendCounter.dataset.target || "0");
+        if (!Number.isNaN(target)) {
+            animateCounter(avgCustomerSpendCounter, target, { duration: 1400, isCurrency: true });
+        }
+    }
+}
+
 const dashboardStorageKey = "vendor-dashboard-chart-preferences";
 const savedChartPreferences = JSON.parse(localStorage.getItem(dashboardStorageKey) || "{}");
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDashboardCounters();
+
+    const toggleBusinessBtn = document.getElementById("toggle-business-profile");
+    const businessPanel = document.querySelector(".vendor-hero__business");
+    if (toggleBusinessBtn && businessPanel) {
+        toggleBusinessBtn.addEventListener("click", () => {
+            businessPanel.classList.toggle("collapsed");
+            const isHidden = businessPanel.classList.contains("collapsed");
+            toggleBusinessBtn.textContent = isHidden ? "Show business details" : "Hide business details";
+        });
+    }
+
+    const crmPreview = document.getElementById("crm-preview");
+    const crmToggleBtn = document.getElementById("crm-toggle-btn");
+    if (crmPreview && crmToggleBtn) {
+        crmToggleBtn.addEventListener("click", () => {
+            const expanded = crmPreview.classList.toggle("expanded");
+            console.log("CRM toggle clicked, expanded:", expanded, "crmPreview:", crmPreview);
+            crmToggleBtn.textContent = expanded ? "Collapse CRM list" : "View full CRM";
+            crmToggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+        });
+    }
+});
 
 document.querySelectorAll("[data-chart-toggle]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -794,11 +885,36 @@ document.querySelectorAll(".period-toggle__link").forEach((link) => {
     });
 });
 
+const popupSeenKey = "vendor-dashboard-popup-seen";
+const dashboardPopup = document.getElementById("dashboard-popup");
+if (dashboardPopup && !sessionStorage.getItem(popupSeenKey)) {
+    setTimeout(() => {
+        dashboardPopup.classList.add("show");
+    }, 150);
+
+    setTimeout(() => {
+        dashboardPopup.classList.remove("show");
+    }, 2600);
+
+    sessionStorage.setItem(popupSeenKey, "1");
+}
+
 const savedScroll = sessionStorage.getItem(dashboardScrollKey);
 if (savedScroll !== null) {
     window.addEventListener("load", () => {
         window.scrollTo({ top: Number(savedScroll), behavior: "auto" });
         sessionStorage.removeItem(dashboardScrollKey);
+    });
+}
+
+// CRM preview / expand behaviour
+const crmPreview = document.getElementById("crm-preview");
+const crmToggleBtn = document.getElementById("crm-toggle-btn");
+if (crmPreview && crmToggleBtn) {
+    crmToggleBtn.addEventListener("click", () => {
+        const expanded = crmPreview.classList.toggle("expanded");
+        crmToggleBtn.textContent = expanded ? "Collapse CRM list" : "View full CRM";
+        crmToggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
     });
 }
 </script>

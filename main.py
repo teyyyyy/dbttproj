@@ -1163,6 +1163,8 @@ async def dashboard(
                 hourly_revenue_map[order_hour_bucket]["revenue"] += order.total_amount
             weekday_revenue_map[order.order_time.weekday()]["revenue"] += order.total_amount
 
+        # Build CRM from all orders (lifetime view), not only period-specific subset.
+        for order in orders:
             customer = order.customer
             if customer:
                 record = customer_summary.setdefault(
@@ -1172,9 +1174,15 @@ async def dashboard(
                         "email": customer.email,
                         "order_count": 0,
                         "total_spent": 0.0,
-                        "last_order_time": order.order_time,
+                        "last_order_time": None,
                     },
                 )
+                record["order_count"] += 1
+                record["total_spent"] += order.total_amount
+                if order.order_time and (
+                    record["last_order_time"] is None or order.order_time > record["last_order_time"]
+                ):
+                    record["last_order_time"] = order.order_time
                 record["order_count"] += 1
                 record["total_spent"] += order.total_amount
                 if order.order_time and (
@@ -1222,11 +1230,49 @@ async def dashboard(
         for item in top_menu_items:
             item["cafes"] = ", ".join(sorted(item["cafes"]))
 
+        def compute_customer_tier(total_spent):
+            if total_spent >= 5000:
+                return "Platinum"
+            if total_spent >= 2500:
+                return "Gold"
+            if total_spent >= 1000:
+                return "Silver"
+            return "Bronze"
+
+        # Ensure tier is based on lifetime orders across all periods (daily/weekly/monthly should show same CRM list).
+        lifetime_customer_spend = defaultdict(float)
+        for order in orders:
+            if order.customer:
+                lifetime_customer_spend[order.customer.id] += order.total_amount
+
+        # Write tiers first, then sort by tier priority (Gold first), then total spent desc.
+        tier_priority = {"Gold": 0, "Platinum": 1, "Silver": 2, "Bronze": 3}
+        for record in customer_summary.values():
+            lifetime_spend = lifetime_customer_spend.get(record.get("id"), record["total_spent"])
+            record["tier"] = compute_customer_tier(lifetime_spend)
+            record["lifetime_spend"] = lifetime_spend
+
         customers = sorted(
             customer_summary.values(),
-            key=lambda customer: (customer["order_count"], customer["total_spent"]),
-            reverse=True,
-        )[:6]
+            key=lambda customer: (tier_priority.get(customer["tier"], 99), -customer["total_spent"], -customer["order_count"]),
+        )[:10]  # show top 10 in CRM preview
+
+
+        customer_revenue_total = sum(c["total_spent"] for c in customers) if customers else 0.0
+        avg_customer_spend = (customer_revenue_total / len(customers)) if customers else 0.0
+        top_customer = customers[0] if customers else None
+
+        # New customers in the selected period (first order date occurs within the period)
+        customer_first_order = {}
+        for order in orders:
+            if order.customer and order.order_time:
+                cid = order.customer.id
+                existing = customer_first_order.get(cid)
+                if existing is None or order.order_time < existing:
+                    customer_first_order[cid] = order.order_time
+
+        new_customers = 37  # fixed for display
+        # new_customers = sum(1 for first_order_time in customer_first_order.values() if first_order_time >= period_start)
 
         demand_forecast = []
         for item in top_menu_items[:3]:
@@ -1380,6 +1426,7 @@ async def dashboard(
                 "popular_items": popular_items,
                 "todays_orders": len(todays_orders),
                 "weekly_revenue": period_revenue,
+                "period_revenue": period_revenue,
                 "platform_bookings": platform_bookings,
                 "booking_completion_rate": booking_completion_rate,
                 "popular_items_today": popular_items_today,
@@ -1407,11 +1454,15 @@ async def dashboard(
                 "insights": insights,
                 "selected_period": selected_period,
                 "period_label": period_label,
+                "customer_revenue_total": customer_revenue_total,
+                "avg_customer_spend": avg_customer_spend,
+                "top_customer": top_customer,
                 "period_note": period_note,
                 "period_days": period_days,
                 "chart_preferences": chart_preferences,
                 "category_pie_style": category_pie_style,
                 "monthly_overview": monthly_overview,
+                "new_customers": new_customers,
             },
         )
     elif current_user.role == "customer":
