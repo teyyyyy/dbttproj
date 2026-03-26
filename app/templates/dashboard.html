@@ -13,7 +13,7 @@
         </p>
         <div class="vendor-hero__stats">
             <div class="hero-stat">
-                <span id="total-orders-counter" class="hero-stat__value animated-counter" data-target="{{ total_orders }}">0</span>
+                <span id="total-orders-counter" class="hero-stat__value animated-counter" data-target="{{ display_total_orders }}">0</span>
                 <span class="hero-stat__label">Total orders</span>
             </div>
             <div class="hero-stat">
@@ -49,17 +49,17 @@
     </article>
     <article class="dashboard-card metric-card metric-card--warm">
         <p class="metric-card__label">{{ period_label }} revenue</p>
-        <h2><span id="revenue-counter" class="animated-counter" data-target="{{ "%.2f"|format(period_revenue) }}">$0.00</span></h2>
+        <h2><span id="revenue-counter" class="animated-counter" data-target="{{ "%.2f"|format(display_period_revenue) }}">$0.00</span></h2>
         <p class="metric-card__note">Revenue generated in the {{ period_note }}.</p>
     </article>
     <article class="dashboard-card metric-card">
         <p class="metric-card__label">Customers reached</p>
-        <h2><span id="customers-counter" class="animated-counter" data-target="{{ customers|length }}">0</span></h2>
+        <h2><span id="customers-counter" class="animated-counter" data-target="{{ display_customers_count }}">0</span></h2>
         <p class="metric-card__note">Unique customers identified for CRM follow-up in the {{ period_note }}.</p>
     </article>
     <article class="dashboard-card metric-card">
         <p class="metric-card__label">Bookings via platform</p>
-        <h2><span id="platform-bookings-counter" class="animated-counter" data-target="{{ platform_bookings }}">0</span></h2>
+        <h2><span id="platform-bookings-counter" class="animated-counter" data-target="{{ display_platform_bookings }}">0</span></h2>
         <p class="metric-card__note">{{ booking_completion_rate }}% completed or ready in the {{ period_note }}.</p>
     </article>
 </section>
@@ -148,7 +148,7 @@
         </div>
         {% if top_menu_items %}
         <div class="list-stack">
-            {% for item in top_menu_items %}
+                {% for item in display_top_menu_items %}
             <div class="list-row popular-item-row popular-item-row--{{ loop.index }}">
                 <div>
                     <strong>{{ item.name }}</strong>
@@ -214,20 +214,20 @@
         <div class="daily-chart-summary">
             <div class="daily-chart-summary__item">
                 <span class="daily-chart-summary__label">Today total</span>
-                <strong>${{ "%.0f"|format(daily_chart_summary.total) }}</strong>
+                <strong>${{ "%.0f"|format(display_daily_chart_summary.total) }}</strong>
             </div>
             <div class="daily-chart-summary__item">
                 <span class="daily-chart-summary__label">Peak hour</span>
-                <strong>{{ daily_chart_summary.peak_hour }}</strong>
-                <small>${{ "%.0f"|format(daily_chart_summary.peak_value) }}</small>
+                <strong>{{ display_daily_chart_summary.peak_hour }}</strong>
+                <small>${{ "%.0f"|format(display_daily_chart_summary.peak_value) }}</small>
             </div>
             <div class="daily-chart-summary__item">
                 <span class="daily-chart-summary__label">Active hours</span>
-                <strong>{{ daily_chart_summary.active_hours }}</strong>
+                <strong>{{ display_daily_chart_summary.active_hours }}</strong>
             </div>
             <div class="daily-chart-summary__item">
                 <span class="daily-chart-summary__label">Avg active hour</span>
-                <strong>${{ "%.0f"|format(daily_chart_summary.average_active_hour) }}</strong>
+                <strong>${{ "%.0f"|format(display_daily_chart_summary.average_active_hour) }}</strong>
             </div>
         </div>
         {% elif selected_period == 'monthly' %}
@@ -416,7 +416,7 @@
         </div>
         {% if top_menu_items %}
         <div class="list-stack">
-            {% for item in top_menu_items %}
+            {% for item in display_top_menu_items %}
             <div class="list-row popular-item-row popular-item-row--{{ loop.index }}">
                 <div>
                     <strong>{{ item.name }}</strong>

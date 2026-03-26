@@ -578,6 +578,46 @@ footer {
     transform: translateY(-2px);
 }
 
+.order-card--confirmed {
+    background: linear-gradient(180deg, rgba(215, 234, 216, 0.98), rgba(255, 255, 255, 0.96));
+    border-color: rgba(36, 92, 67, 0.24);
+    box-shadow: 0 16px 34px rgba(36, 92, 67, 0.1);
+}
+
+.order-card--confirmed .card-header {
+    background: rgba(36, 92, 67, 0.12);
+}
+
+.order-card--preparing {
+    background: linear-gradient(180deg, rgba(224, 235, 245, 0.98), rgba(255, 255, 255, 0.96));
+    border-color: rgba(69, 111, 143, 0.28);
+    box-shadow: 0 16px 34px rgba(69, 111, 143, 0.1);
+}
+
+.order-card--preparing .card-header {
+    background: rgba(69, 111, 143, 0.14);
+}
+
+.order-card--ready {
+    background: linear-gradient(180deg, rgba(252, 235, 205, 0.98), rgba(255, 255, 255, 0.96));
+    border-color: rgba(198, 147, 43, 0.28);
+    box-shadow: 0 16px 34px rgba(198, 147, 43, 0.1);
+}
+
+.order-card--ready .card-header {
+    background: rgba(198, 147, 43, 0.16);
+}
+
+.order-card--delivered {
+    background: linear-gradient(180deg, rgba(233, 236, 235, 0.98), rgba(255, 255, 255, 0.96));
+    border-color: rgba(17, 34, 24, 0.14);
+    box-shadow: 0 16px 34px rgba(17, 34, 24, 0.08);
+}
+
+.order-card--delivered .card-header {
+    background: rgba(17, 34, 24, 0.08);
+}
+
 .order-card--pending {
     background: linear-gradient(180deg, rgba(255, 244, 228, 0.98), rgba(255, 255, 255, 0.96));
     border-color: rgba(198, 106, 43, 0.36);
@@ -611,8 +651,8 @@ footer {
 }
 
 .order-status-badge--ready {
-    background: #2f8f57;
-    color: #f4fff8;
+    background: rgba(198, 147, 43, 0.18);
+    color: #8a5a00;
 }
 
 .order-status-badge--delivered {
@@ -1061,6 +1101,7 @@ footer {
     color: #8a491d;
 }
 
+.status-filter-chip--new,
 .status-filter-chip--confirmed {
     background: rgba(36, 92, 67, 0.12);
     border-color: rgba(36, 92, 67, 0.2);
@@ -1074,14 +1115,20 @@ footer {
 }
 
 .status-filter-chip--ready {
-    background: rgba(47, 143, 87, 0.16);
-    border-color: rgba(47, 143, 87, 0.26);
-    color: #1f6e41;
+    background: rgba(198, 147, 43, 0.18);
+    border-color: rgba(198, 147, 43, 0.28);
+    color: #8a5a00;
 }
 
 .status-filter-chip--delivered {
     background: rgba(17, 34, 24, 0.08);
     border-color: rgba(17, 34, 24, 0.12);
+    color: var(--brand-ink);
+}
+
+.status-filter-chip--closed {
+    background: rgba(17, 34, 24, 0.12);
+    border-color: rgba(17, 34, 24, 0.18);
     color: var(--brand-ink);
 }
 
