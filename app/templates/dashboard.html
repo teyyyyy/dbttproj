@@ -137,8 +137,9 @@
     </div>
 </section>
 
-<section class="dashboard-grid {% if selected_period == 'monthly' %}dashboard-grid--single{% else %}dashboard-grid--split{% endif %}">
-    {% if selected_period != 'monthly' %}
+<section class="dashboard-grid dashboard-grid--split">
+
+    <!-- ================= MENU ANALYTICS ================= -->
     <article class="dashboard-card">
         <div class="section-heading">
             <div>
@@ -146,13 +147,19 @@
                 <h3>Best-performing items</h3>
             </div>
         </div>
+
         {% if top_menu_items %}
         <div class="list-stack">
             {% for item in top_menu_items %}
             <div class="list-row popular-item-row popular-item-row--{{ loop.index }}">
                 <div>
                     <strong>{{ item.name }}</strong>
-                    <p>{{ item.category|capitalize }}{% if managed_cafe %} • {{ managed_cafe.name }}{% elif item.cafes %} • {{ item.cafes }}{% endif %}</p>
+                    <p>
+                        {{ item.category|capitalize }}
+                        {% if managed_cafe %} • {{ managed_cafe.name }}
+                        {% elif item.cafes %} • {{ item.cafes }}
+                        {% endif %}
+                    </p>
                 </div>
                 <div class="list-row__meta">
                     <span>{{ item.quantity_sold }} sold</span>
@@ -165,52 +172,76 @@
         <p class="empty-state">Once orders are placed, this section will highlight your best-selling menu items.</p>
         {% endif %}
     </article>
-    {% endif %}
 
-    <article class="dashboard-card {% if selected_period == 'monthly' %}dashboard-card--wide{% endif %}">
+    <!-- ================= SALES TREND ================= -->
+    <article class="dashboard-card">
         <div class="section-heading">
             <div>
                 <p class="eyebrow">Sales trend</p>
-                <h3>{% if selected_period == 'daily' %}Hourly revenue line graph{% else %}{{ period_label }} sales trend{% endif %}</h3>
+                <h3>
+                    {% if selected_period == 'daily' %}
+                        Hourly revenue line graph
+                    {% else %}
+                        {{ period_label }} sales trend
+                    {% endif %}
+                </h3>
             </div>
-            {% if selected_period not in ['daily', 'monthly'] %}
-            <div class="chart-toggle">
-                <button type="button" class="chart-toggle__link {% if chart_preferences.trend == 'bar' %}chart-toggle__link--active{% endif %}" data-chart-toggle="trend" data-chart-view="bar">Bar graph</button>
-                <button type="button" class="chart-toggle__link {% if chart_preferences.trend == 'histogram' %}chart-toggle__link--active{% endif %}" data-chart-toggle="trend" data-chart-view="histogram">Histogram</button>
-            </div>
-            {% endif %}
         </div>
-        {% set max_sales_revenue = weekly_sales_data | map(attribute='revenue') | max if weekly_sales_data else 0 %}
-        {% set min_sales_revenue = weekly_sales_data | map(attribute='revenue') | min if weekly_sales_data else 0 %}
-        {% set sales_revenue_range = max_sales_revenue - min_sales_revenue %}
+
+        <!-- ================= DATA PREP ================= -->
         {% if selected_period == 'daily' %}
+            {% set points = hourly_revenue_points %}
+            {% set polyline = hourly_revenue_polyline %}
+            {% set ticks = daily_revenue_ticks %}
+        {% elif selected_period == 'monthly' %}
+            {% set points = monthly_points %}
+            {% set polyline = monthly_polyline %}
+            {% set ticks = monthly_revenue_ticks %}
+        {% else %}
+            {% set points = weekly_points %}
+            {% set polyline = weekly_polyline %}
+            {% set ticks = weekly_revenue_ticks %}
+        {% endif %}
+
+        {% set data = hourly_revenue_points if selected_period == 'daily' else weekly_sales_data %}
+        {% set max_rev = data | map(attribute='revenue') | max if data else 1000 %}
+        {% set n = (data|length - 1) if data|length > 1 else 1 %}
+
         <div class="scatter-chart scatter-chart--with-axis scatter-chart--daily">
             <div class="scatter-chart__axis scatter-chart__axis--daily">
-                {% for tick in daily_revenue_ticks %}
-                <span>${{ "%.0f"|format(tick) }}</span>
-                {% endfor %}
+                <span>${{ "%.0f"|format(max_rev|round) }}</span>
+                <span>${{ "%.0f"|format((max_rev * 0.8)|round) }}</span>
+                <span>${{ "%.0f"|format((max_rev * 0.6)|round) }}</span>
+                <span>${{ "%.0f"|format((max_rev * 0.4)|round) }}</span>
+                <span>${{ "%.0f"|format((max_rev * 0.2)|round) }}</span>
+                <span>$0</span>
             </div>
             <div class="scatter-chart__main">
                 <div class="scatter-chart__plot scatter-chart__plot--daily">
                     <svg class="scatter-chart__line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                        <polyline points="{{ hourly_revenue_polyline }}" />
+                        <polyline points="{% for item in data %}{{ (loop.index0 / n * 100)|round(2) }},{{ 100 - ((item.revenue / max_rev) * 90)|round(2) }}{% if not loop.last %},{% endif %}{% endfor %}" />
                     </svg>
-                    {% for point in hourly_revenue_points %}
-                    <span
-                        class="scatter-chart__point scatter-chart__point--daily"
-                        title="{{ point.label }}: ${{ '%.0f'|format(point.revenue) }}"
-                        style="left: {{ point.x }}%; bottom: {{ point.y }}%;"
-                    ></span>
-                    {% endfor %}
                 </div>
                 <div class="scatter-chart__labels scatter-chart__labels--absolute">
-                    {% for point in hourly_revenue_points %}
-                    <span style="left: {{ point.x }}%;">{{ point.label }}</span>
-                    {% endfor %}
+                    {% if selected_period == 'monthly' %}
+                        {% for i in range(0, data|length, 2) %}
+                            <span style="left: {{ (i / n * 100)|round(2) }}%; font-size: 0.75em;">{{ data[i].label }}</span>
+                        {% endfor %}
+                    {% else %}
+                        {% for item in data %}
+                            <span style="left: {{ (loop.index0 / n * 100)|round(2) }}%;">{{ item.label }}</span>
+                        {% endfor %}
+                    {% endif %}
                 </div>
             </div>
         </div>
-        <p class="metric-card__note">{{ managed_cafe.operating_hours if managed_cafe else "Operating hours" }} revenue pattern.</p>
+    </div>
+
+        <!-- ================= DAILY SUMMARY ================= -->
+        {% if selected_period == 'daily' %}
+        <p class="metric-card__note">
+            {{ managed_cafe.operating_hours if managed_cafe else "Operating hours" }} revenue pattern.
+        </p>
         <div class="daily-chart-summary">
             <div class="daily-chart-summary__item">
                 <span class="daily-chart-summary__label">Today total</span>
@@ -230,100 +261,55 @@
                 <strong>${{ "%.0f"|format(daily_chart_summary.average_active_hour) }}</strong>
             </div>
         </div>
-        {% elif selected_period == 'monthly' %}
-        {% set mid_sales_revenue = ((max_sales_revenue + min_sales_revenue) / 2) %}
-        <div class="scatter-chart scatter-chart--with-axis">
-            <div class="scatter-chart__axis">
-                <span>${{ "%.0f"|format(max_sales_revenue) }}</span>
-                <span>${{ "%.0f"|format(mid_sales_revenue) }}</span>
-                <span>${{ "%.0f"|format(min_sales_revenue) }}</span>
+    {% elif selected_period == 'weekly' %}
+        <p class="metric-card__note">{{ period_label }} revenue pattern.</p>
+        <div class="weekly-chart-summary">
+            <div class="weekly-chart-summary__item">
+                <span class="weekly-chart-summary__label">Week total</span>
+                <strong>${{ "%.0f"|format(weekly_chart_summary.total) }}</strong>
             </div>
-            <div class="scatter-chart__main">
-                <div class="scatter-chart__plot">
-                    {% for day in weekly_sales_data %}
-                    <span
-                        class="scatter-chart__point"
-                        title="Day {{ day.label }}: ${{ '%.0f'|format(day.revenue) }}"
-                        style="left: {{ (loop.index0 / ((weekly_sales_data|length - 1) if weekly_sales_data|length > 1 else 1) * 100) | round(2) }}%; bottom: {{ (18 + (((day.revenue - min_sales_revenue) / (sales_revenue_range if sales_revenue_range else 1)) * 74)) | round(2) if sales_revenue_range else 46 }}%;"
-                    ></span>
-                    {% endfor %}
-                </div>
-                <div class="scatter-chart__labels" style="grid-template-columns: repeat({{ weekly_sales_data|length }}, minmax(22px, 1fr));">
-                    {% for day in weekly_sales_data %}
-                    <span>{{ day.label }}</span>
-                    {% endfor %}
-                </div>
+            <div class="weekly-chart-summary__item">
+                <span class="weekly-chart-summary__label">Best day</span>
+                <strong>{{ weekly_chart_summary.best_day }}</strong>
+                <small>${{ "%.0f"|format(weekly_chart_summary.best_value) }}</small>
+            </div>
+            <div class="weekly-chart-summary__item">
+                <span class="weekly-chart-summary__label">Active days</span>
+                <strong>{{ weekly_chart_summary.active_days }}</strong>
+            </div>
+            <div class="weekly-chart-summary__item">
+                <span class="weekly-chart-summary__label">Avg active day</span>
+                <strong>${{ "%.0f"|format(weekly_chart_summary.average_active_day) }}</strong>
             </div>
         </div>
-        {% else %}
-        <div data-chart-panel="trend" data-chart-view="scatter" class="{% if chart_preferences.trend != 'scatter' %}is-hidden{% endif %}">
-            <div class="scatter-chart">
-                <div class="scatter-chart__plot">
-                    {% for day in weekly_sales_data %}
-                    <span
-                        class="scatter-chart__point"
-                        title="{{ day.label }}: ${{ '%.0f'|format(day.revenue) }}"
-                        style="left: {{ (loop.index0 / ((weekly_sales_data|length - 1) if weekly_sales_data|length > 1 else 1) * 100) | round(2) }}%; bottom: {{ (18 + (((day.revenue - min_sales_revenue) / (sales_revenue_range if sales_revenue_range else 1)) * 74)) | round(2) if sales_revenue_range else 46 }}%;"
-                    ></span>
-                    {% endfor %}
-                </div>
-                <div class="scatter-chart__labels">
-                    {% for day in weekly_sales_data %}
-                    <span>{{ day.label }}</span>
-                    {% endfor %}
-                </div>
+    {% elif selected_period == 'monthly' %}
+        <p class="metric-card__note">{{ period_label }} revenue pattern.</p>
+        <div class="monthly-chart-summary">
+            <div class="monthly-chart-summary__item">
+                <span class="monthly-chart-summary__label">Month total</span>
+                <strong>${{ "%.0f"|format(monthly_chart_summary.total) }}</strong>
+            </div>
+            <div class="monthly-chart-summary__item">
+                <span class="monthly-chart-summary__label">Best day</span>
+                <strong>{{ monthly_chart_summary.best_day }}</strong>
+                <small>${{ "%.0f"|format(monthly_chart_summary.best_value) }}</small>
+            </div>
+            <div class="monthly-chart-summary__item">
+                <span class="monthly-chart-summary__label">Active days</span>
+                <strong>{{ monthly_chart_summary.active_days }}</strong>
+            </div>
+            <div class="monthly-chart-summary__item">
+                <span class="monthly-chart-summary__label">Avg active day</span>
+                <strong>${{ "%.0f"|format(monthly_chart_summary.average_active_day) }}</strong>
             </div>
         </div>
-        <div data-chart-panel="trend" data-chart-view="histogram" class="{% if chart_preferences.trend != 'histogram' %}is-hidden{% endif %}">
-            <div class="histogram-chart" style="grid-template-columns: repeat({{ weekly_sales_data|length }}, minmax(0, 1fr));">
-                {% for day in weekly_sales_data %}
-                <div class="histogram-chart__item">
-                    <div class="histogram-chart__bar-wrap">
-                        <div class="histogram-chart__bar" style="height: {{ 18 if day.revenue == 0 else (day.revenue / (max_sales_revenue if max_sales_revenue else 1) * 160 + 18) | round(0, 'ceil') }}px;"></div>
-                    </div>
-                    <strong>${{ "%.0f"|format(day.revenue) }}</strong>
-                    <span>{{ day.label }}</span>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        <div data-chart-panel="trend" data-chart-view="bar" class="{% if chart_preferences.trend != 'bar' %}is-hidden{% endif %}">
-            <div class="landscape-chart-grid">
-                {% for day in weekly_sales_data %}
-                <div class="landscape-chart-card">
-                    <div class="landscape-chart-card__label">
-                        <strong>{{ day.label }}</strong>
-                        <span>${{ "%.0f"|format(day.revenue) }}</span>
-                    </div>
-                    <div class="landscape-chart-card__track">
-                        <div class="landscape-chart-card__fill" style="width: {{ (day.revenue / (max_sales_revenue if max_sales_revenue else 1) * 100) | round(0, 'ceil') if day.revenue else 0 }}%;"></div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
+    {% endif %}
     </article>
 </section>
 
-{% if selected_period == 'monthly' %}
-<section class="dashboard-grid dashboard-grid--three">
-    <article class="dashboard-card metric-card metric-card--accent">
-        <p class="metric-card__label">Monthly revenue</p>
-        <h2>${{ "%.2f"|format(weekly_revenue) }}</h2>
-        <p class="metric-card__note">Total revenue recorded in {{ period_note }}.</p>
-    </article>
-    <article class="dashboard-card metric-card metric-card--warm">
-        <p class="metric-card__label">Avg daily revenue</p>
-        <h2>${{ "%.2f"|format(monthly_overview.average_daily_revenue) }}</h2>
-        <p class="metric-card__note">A simple pacing check for the current month.</p>
-    </article>
-    <article class="dashboard-card metric-card">
-        <p class="metric-card__label">Completion rate</p>
-        <h2>{{ booking_completion_rate }}%</h2>
-        <p class="metric-card__note">Completed or ready orders across the month.</p>
-    </article>
-</section>
+
+
+
 
 <section class="dashboard-grid dashboard-grid--split">
     <article class="dashboard-card">
@@ -483,6 +469,7 @@
         {% endif %}
     </article>
 </section>
+
 {% else %}
 <section class="dashboard-grid dashboard-grid--split">
     <article class="dashboard-card">
@@ -909,7 +896,7 @@ if (savedScroll !== null) {
 
 
 </script>
-{% elif current_user.role == 'customer' %}
+{% if current_user.role == 'customer' %}
 <div class="row">
     <div class="col-md-6">
         <div class="card">

@@ -1259,7 +1259,9 @@ async def dashboard(
 
 
         customer_revenue_total = sum(c["total_spent"] for c in customers) if customers else 0.0
-        avg_customer_spend = (customer_revenue_total / len(customers)) if customers else 0.0
+        # Total people across all orders
+        total_people = sum(o.party_size for o in orders if hasattr(o, 'party_size') and o.party_size)
+        avg_customer_spend = customer_revenue_total / total_people if total_people else 0.0
         top_customer = customers[0] if customers else None
 
         # New customers in the selected period (first order date occurs within the period)
@@ -1388,6 +1390,30 @@ async def dashboard(
                 else 0
             ),
         }
+        # WEEKLY SUMMARY - use correct period data
+        weekly_chart_summary = {
+            "total": round(sum(entry["revenue"] for entry in daily_revenue_map.values()), 2),
+            "best_day": max(daily_revenue_map.values(), key=lambda entry: entry["revenue"], default={"label": "--"})["label"],
+            "best_value": round(max(daily_revenue_map.values(), key=lambda entry: entry["revenue"], default={"revenue": 0})["revenue"], 2),
+            "active_days": len([entry for entry in daily_revenue_map.values() if entry["revenue"] > 0]),
+            "average_active_day": round(
+                sum(entry["revenue"] for entry in daily_revenue_map.values() if entry["revenue"] > 0) / 
+                len([entry for entry in daily_revenue_map.values() if entry["revenue"] > 0]) if any(entry["revenue"] > 0 for entry in daily_revenue_map.values()) else 0, 2
+            ),
+        }
+
+        # MONTHLY SUMMARY - same data source for now
+        monthly_chart_summary = {
+            "total": round(period_revenue, 2),
+            "best_day": max(daily_revenue_map.values(), key=lambda entry: entry["revenue"], default={"label": "--"})["label"],
+            "best_value": round(max(daily_revenue_map.values(), key=lambda entry: entry["revenue"], default={"revenue": 0})["revenue"], 2),
+            "active_days": len([entry for entry in daily_revenue_map.values() if entry["revenue"] > 0]),
+            "average_active_day": round(
+                sum(entry["revenue"] for entry in daily_revenue_map.values() if entry["revenue"] > 0) / 
+                len([entry for entry in daily_revenue_map.values() if entry["revenue"] > 0]) if any(entry["revenue"] > 0 for entry in daily_revenue_map.values()) else 0, 2
+            ),
+        }
+
         best_sales_day = max(daily_revenue_map.values(), key=lambda entry: entry["revenue"], default=None)
         best_booking_day = max(daily_booking_map.values(), key=lambda entry: entry["count"], default=None)
         busiest_hour = max(hourly_order_map.values(), key=lambda entry: entry["count"], default=None)
@@ -1447,6 +1473,8 @@ async def dashboard(
                 "daily_revenue_scale_max": daily_revenue_scale_max,
                 "daily_revenue_ticks": daily_revenue_ticks,
                 "daily_chart_summary": daily_chart_summary,
+                "weekly_chart_summary": weekly_chart_summary,
+                "monthly_chart_summary": monthly_chart_summary,
                 "weekday_revenue_data": list(weekday_revenue_map.values()),
                 "category_sales_data": category_sales_data,
                 "demand_forecast": demand_forecast,
@@ -1469,6 +1497,21 @@ async def dashboard(
         orders = db.query(Order).filter(Order.customer_id == current_user.id).limit(5).all()
         points_balance = db.query(Point).filter(Point.user_id == current_user.id).count()  # Simplified
         return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": current_user, "orders": orders, "points_balance": points_balance})
+
+from sqlalchemy import text 
+@app.get("/db-dump-full")
+async def dump_full(db: Session = Depends(get_db)):
+    from sqlalchemy import inspect
+    insp = inspect(db.bind)
+    tables = insp.get_table_names()
+    
+    data = {}
+    for table in sorted(tables):
+        count = db.execute(f"SELECT COUNT(*) FROM {table}").scalar()
+        sample = db.execute(f"SELECT * FROM {table} LIMIT 3").fetchall()
+        data[table] = {"count": count, "sample_rows": [dict(row._mapping) for row in sample]}
+    
+    return data
 
 @app.get("/cafes/{cafe_id}/edit", response_class=HTMLResponse)
 async def edit_menu(request: Request, cafe_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_optional)):

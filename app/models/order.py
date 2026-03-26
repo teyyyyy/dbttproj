@@ -14,7 +14,10 @@ class Order(Base):
     order_time = Column(DateTime(timezone=True), server_default=func.now())
     delivery_address = Column(Text)
     notes = Column(Text, nullable=True)
-
+    
+    # 👇 ADD THESE 2 LINES
+    party_size = Column(Integer, default=1, nullable=False)
+    
     customer = relationship("User")
     cafe = relationship("Cafe", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
