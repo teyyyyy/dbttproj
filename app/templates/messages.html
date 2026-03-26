@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Messages - Café Discovery{% endblock %}
+{% block content %}
+<div class="row">
+    <!-- Inbox Pane -->
+    <div class="col-md-4">
+        <h4 class="fw-bold mb-3">Messages</h4>
+        <div class="card shadow-sm border-0 mb-4 h-100">
+            <div class="list-group list-group-flush" id="thread-list">
+                {% if threads %}
+                    {% for thread in threads %}
+                    <button class="list-group-item list-group-item-action thread-btn" 
+                            data-target-id="{{ thread.id }}" 
+                            data-cafe-id="{{ thread.cafe_id if current_user.role == 'vendor' else thread.id }}"
+                            data-name="{{ thread.name }}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 fw-bold">{{ thread.name }}</h6>
+                            <small class="text-muted">{{ thread.timestamp }}</small>
+                        </div>
+                        <p class="mb-1 text-truncate small {% if thread.unread %}fw-bold{% endif %}">{{ thread.latest_msg }}</p>
+                        {% if thread.unread %}
+                        <span class="badge bg-danger rounded-pill">New</span>
+                        {% endif %}
+                    </button>
+                    {% endfor %}
+                {% else %}
+                    <div class="p-4 text-center text-muted">No messages yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Chat Pane -->
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 h-100 d-flex flex-column" id="chat-container" style="min-height: 500px; max-height: 600px;">
+            <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center py-3">
+                <h5 class="m-0 fw-bold" id="chat-title">Select a conversation</h5>
+            </div>
+            <div class="card-body bg-light overflow-auto p-4 flex-grow-1 border-top border-bottom" id="chat-history">
+                <div class="text-center text-muted mt-5">Please select a thread from the left to start chatting!</div>
+            </div>
+            <div class="card-footer bg-white border-0 p-3">
+                <form id="chat-form" class="d-flex d-none">
+                    <input type="text" class="form-control rounded-pill me-2 bg-light border-0 px-4" id="chat-input" placeholder="Type a message..." required>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.message-bubble {
+    max-width: 75%;
+    padding: 10px 16px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+    clear: both;
+    font-size: 0.95rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+.message-mine {
+    background-color: var(--brand-green);
+    color: white;
+    float: right;
+    border-bottom-right-radius: 4px;
+}
+.message-theirs {
+    background-color: #fff;
+    color: var(--brand-ink);
+    border: 1px solid rgba(0,0,0,0.05);
+    float: left;
+    border-bottom-left-radius: 4px;
+}
+</style>
+
+<script>
+    let activeCafeId = null;
+    let activeCustomerId = null;
+    let userRole = "{{ current_user.role }}";
+
+    // Auto-select a cafe if parameterized
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialCafeId = urlParams.get('cafe_id');
+
+    document.querySelectorAll('.thread-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.thread-btn').forEach(b => b.classList.remove('bg-light', 'border-primary'));
+            this.classList.add('bg-light', 'border-primary');
+            
+            const badge = this.querySelector('.badge');
+            if (badge) badge.remove();
+            this.querySelector('p').classList.remove('fw-bold');
+
+            const name = this.dataset.name;
+            const targetId = this.dataset.targetId;
+            const cafeId = this.dataset.cafeId;
+            
+            document.getElementById('chat-title').textContent = name;
+            document.getElementById('chat-form').classList.remove('d-none');
+            
+            activeCafeId = cafeId;
+            if (userRole === "vendor") {
+                activeCustomerId = targetId;
+            }
+
+            loadMessages();
+        });
+    });
+
+    function loadMessages() {
+        if (!activeCafeId) return;
+        
+        let url = `/api/chat/${activeCafeId}`;
+        if (userRole === "vendor" && activeCustomerId) {
+            url += `?customer_id=${activeCustomerId}`;
+        }
+
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                const historyDiv = document.getElementById('chat-history');
+                historyDiv.innerHTML = '';
+                
+                if (data.length === 0) {
+                    historyDiv.innerHTML = '<div class="text-center text-muted mt-4">Start the conversation!</div>';
+                    return;
+                }
+
+                data.forEach(msg => {
+                    const div = document.createElement('div');
+                    div.className = `message-bubble ${msg.is_mine ? 'message-mine' : 'message-theirs'}`;
+                    div.innerHTML = `
+                        <div>${msg.content}</div>
+                        <div style="font-size: 0.70rem; opacity: 0.8; margin-top: 4px; text-align: right;">${msg.timestamp}</div>
+                    `;
+                    historyDiv.appendChild(div);
+                });
+                
+                const clear = document.createElement('div');
+                clear.style.clear = 'both';
+                historyDiv.appendChild(clear);
+                
+                historyDiv.scrollTop = historyDiv.scrollHeight;
+            });
+    }
+
+    document.getElementById('chat-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const input = document.getElementById('chat-input');
+        const content = input.value.trim();
+        if (!content || !activeCafeId) return;
+        
+        const payload = { content: content };
+        if (userRole === "vendor" && activeCustomerId) {
+            payload.customer_id = parseInt(activeCustomerId, 10);
+        }
+        
+        fetch(`/api/chat/${activeCafeId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        }).then(res => res.json()).then(data => {
+            if(data.status === "success") {
+                input.value = '';
+                loadMessages();
+            }
+        });
+    });
+
+    // Handle initial cafe selection for customers branching out of the detail view
+    if (initialCafeId && userRole === 'customer') {
+        const existingBtn = document.querySelector(`.thread-btn[data-cafe-id="${initialCafeId}"]`);
+        if (existingBtn) {
+            existingBtn.click();
+        } else {
+            // Create a temporary mock thread to start a new chat history securely
+            const cafeName = urlParams.get('cafe_name') || "New Conversation";
+            const tempBtn = document.createElement('button');
+            tempBtn.className = 'list-group-item list-group-item-action thread-btn bg-light border-primary';
+            tempBtn.dataset.targetId = initialCafeId;
+            tempBtn.dataset.cafeId = initialCafeId;
+            tempBtn.dataset.name = cafeName;
+            tempBtn.innerHTML = `<h6 class="mb-1 fw-bold">${cafeName}</h6><p class="mb-1 text-truncate small">Say hi!</p>`;
+            document.getElementById('thread-list').prepend(tempBtn);
+            
+            // Re-apply click handler for this temp button specifically, or manually invoke logic
+            document.getElementById('chat-title').textContent = cafeName;
+            document.getElementById('chat-form').classList.remove('d-none');
+            activeCafeId = initialCafeId;
+            loadMessages();
+            
+            // Reset state inside list group flush to prevent bad UI states if unclicked
+            const noMsg = document.querySelector('.p-4.text-center.text-muted');
+            if (noMsg) noMsg.remove();
+        }
+    }
+</script>
+{% endblock %}
