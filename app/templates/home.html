@@ -183,8 +183,19 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
 ></script>
+<script id="map-data" type="application/json">
+    {{ map_points | tojson }}
+</script>
 <script>
-const mapPoints = {{ map_points | tojson }};
+const mapDataElement = document.getElementById('map-data');
+let mapPoints = [];
+if (mapDataElement) {
+    try {
+        mapPoints = JSON.parse(mapDataElement.textContent);
+    } catch (e) {
+        console.error("Could not parse map points JSON", e);
+    }
+}
 const mapElement = document.getElementById('home-map-leaflet');
 
 if (mapElement && window.L) {
