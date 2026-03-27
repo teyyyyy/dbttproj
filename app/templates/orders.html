@@ -4,6 +4,7 @@
 
 {% block content %}
 <h1>{% if current_user.role == 'vendor' %}Vendor Orders{% else %}Your Orders{% endif %}</h1>
+
 {% if current_user.role == 'vendor' %}
 <p class="text-muted">Monitor incoming orders for {{ managed_cafe.name if managed_cafe else 'your cafe' }} and review each basket in one place.</p>
 
@@ -11,11 +12,10 @@
     <div class="card-body">
         <div class="status-filter-bar">
             <a href="/orders?sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip {% if not order_filters.status %}status-filter-chip--active{% endif %}">All</a>
-            <a href="/orders?status=pending&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--pending {% if order_filters.status == 'pending' %}status-filter-chip--active{% endif %}">Pending</a>
-            <a href="/orders?status=confirmed&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--confirmed {% if order_filters.status == 'confirmed' %}status-filter-chip--active{% endif %}">Confirmed</a>
+            <a href="/orders?status=new&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--new {% if order_filters.status == 'new' %}status-filter-chip--active{% endif %}">New</a>
             <a href="/orders?status=preparing&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--preparing {% if order_filters.status == 'preparing' %}status-filter-chip--active{% endif %}">Preparing</a>
             <a href="/orders?status=ready&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--ready {% if order_filters.status == 'ready' %}status-filter-chip--active{% endif %}">Ready</a>
-            <a href="/orders?status=delivered&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--delivered {% if order_filters.status == 'delivered' %}status-filter-chip--active{% endif %}">Delivered</a>
+            <a href="/orders?status=closed&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--closed {% if order_filters.status == 'closed' %}status-filter-chip--active{% endif %}">Closed</a>
         </div>
         <form method="get" action="/orders" class="row g-3 align-items-end">
             <div class="col-md-2">
@@ -30,11 +30,10 @@
                 <label for="status" class="form-label">Status</label>
                 <select class="form-select" id="status" name="status">
                     <option value="">All</option>
-                    <option value="pending" {% if order_filters.status == 'pending' %}selected{% endif %}>Pending</option>
-                    <option value="confirmed" {% if order_filters.status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                    <option value="new" {% if order_filters.status == 'new' %}selected{% endif %}>New</option>
                     <option value="preparing" {% if order_filters.status == 'preparing' %}selected{% endif %}>Preparing</option>
                     <option value="ready" {% if order_filters.status == 'ready' %}selected{% endif %}>Ready</option>
-                    <option value="delivered" {% if order_filters.status == 'delivered' %}selected{% endif %}>Delivered</option>
+                    <option value="closed" {% if order_filters.status == 'closed' %}selected{% endif %}>Closed</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -104,10 +103,10 @@
                 <h5 class="mb-0">Order status breakdown</h5>
             </div>
             <div class="card-body">
-                <p><strong>Pending:</strong> {{ order_analytics.status_counts.get('pending', 0) }}</p>
-                <p><strong>Confirmed:</strong> {{ order_analytics.status_counts.get('confirmed', 0) }}</p>
-                <p><strong>Preparing:</strong> {{ order_analytics.status_counts.get('preparing', 0) }}</p>
-                <p><strong>Ready / Delivered:</strong> {{ order_analytics.status_counts.get('ready', 0) + order_analytics.status_counts.get('delivered', 0) }}</p>
+                <p class="mb-1"><strong>New:</strong> {{ status_display_counts.new }}</p>
+                <p class="mb-1"><strong>Preparing:</strong> {{ status_display_counts.preparing }}</p>
+                <p class="mb-1"><strong>Ready:</strong> {{ status_display_counts.ready }}</p>
+                <p><strong>Closed:</strong> {{ status_display_counts.closed }}</p>
                 {% if managed_cafe %}
                 <p class="mb-0"><strong>Managed cafe:</strong> {{ managed_cafe.name }}</p>
                 {% elif order_analytics.top_cafe %}
@@ -119,12 +118,20 @@
     <div class="col-md-6">
         <div class="card h-100">
             <div class="card-header">
-                <h5 class="mb-0">Top ordered items</h5>
+                <h5 class="mb-0">Recent order notes</h5>
             </div>
             <div class="card-body">
-                {% for item in order_analytics.top_items %}
-                <p><strong>{{ item.name }}</strong> <span class="text-muted">({{ item.quantity }} sold)</span></p>
-                {% endfor %}
+                {% if recent_order_notes %}
+                    {% for note in recent_order_notes %}
+                    <div class="mb-3">
+                        <p class="mb-1"><strong>{{ note.customer }}</strong></p>
+                        <p class="mb-1">{{ note.note }}</p>
+                        <p class="text-muted mb-0">{{ note.time }}</p>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted mb-0">No order notes have been added yet.</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -137,7 +144,14 @@
     <div class="card h-100 order-card order-card--{{ order.status }}">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Order #{{ order.id }}</h5>
-            <span class="badge order-status-badge order-status-badge--{{ order.status }} text-uppercase">{{ order.status }}</span>
+            {% set status_labels = {
+                'pending': 'Pending',
+                'confirmed': 'New',
+                'preparing': 'Preparing',
+                'ready': 'Closed',
+                'delivered': 'Delivered'
+            } %}
+            <span class="badge order-status-badge order-status-badge--{{ order.status }} text-uppercase">{{ status_labels.get(order.status, order.status) }}</span>
         </div>
         <div class="card-body">
             {% if current_user.role == 'vendor' %}
@@ -163,64 +177,22 @@
 </div>
 {%- endmacro %}
 
-{% if current_user.role == 'vendor' %}
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <p class="text-muted text-uppercase small mb-2">Active queue</p>
-                <h4 class="mb-1">{{ active_orders|length }} orders need attention</h4>
-                <p class="mb-0 text-muted">Pending, confirmed, preparing, and ready orders stay grouped here so live service work is easier to spot.</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <p class="text-muted text-uppercase small mb-2">Past orders</p>
-                <h4 class="mb-1">{{ past_orders|length }} completed orders</h4>
-                <p class="mb-0 text-muted">Delivered orders move into history so older fulfilments do not compete with current tasks.</p>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-{% if orders %}
-{% if active_orders %}
 <section class="mb-4">
-    <div class="d-flex justify-content-between align-items-end mb-3">
-        <div>
-            <p class="text-muted text-uppercase small mb-1">{% if current_user.role == 'vendor' %}Active orders{% else %}Current orders{% endif %}</p>
-            <h3 class="mb-0">{% if current_user.role == 'vendor' %}Orders to prepare or hand off{% else %}Orders still in progress{% endif %}</h3>
+    <div class="card">
+        <div class="card-body">
+            <h3 class="mb-3">{% if current_user.role == 'vendor' %}All Orders{% else %}Your Orders{% endif %}</h3>
+            {% if orders %}
+            <div class="row g-4">
+                {% for order in orders %}
+                {{ order_card(order) }}
+                {% endfor %}
+            </div>
+            {% else %}
+            <p>{% if current_user.role == 'vendor' %}No customer orders have been placed for your cafe yet.{% else %}You have no orders yet.{% endif %}</p>
+            {% endif %}
         </div>
     </div>
-    <div class="row g-3">
-        {% for order in active_orders %}
-        {{ order_card(order) }}
-        {% endfor %}
-    </div>
 </section>
-{% endif %}
-
-{% if past_orders %}
-<section>
-    <div class="d-flex justify-content-between align-items-end mb-3">
-        <div>
-            <p class="text-muted text-uppercase small mb-1">{% if current_user.role == 'vendor' %}Past orders{% else %}Order history{% endif %}</p>
-            <h3 class="mb-0">{% if current_user.role == 'vendor' %}Completed delivery history{% else %}Completed purchases{% endif %}</h3>
-        </div>
-    </div>
-    <div class="row g-3">
-        {% for order in past_orders %}
-        {{ order_card(order) }}
-        {% endfor %}
-    </div>
-</section>
-{% endif %}
-{% else %}
-<p>{% if current_user.role == 'vendor' %}No customer orders have been placed for your cafe yet.{% else %}You have no orders yet.{% endif %}</p>
-{% endif %}
 
 <div class="mt-3">
     {% if current_user.role == 'vendor' %}
@@ -281,7 +253,7 @@ function submitReview() {
     const orderId = document.getElementById('review-order-id').value;
     const rating = document.getElementById('review-rating').value;
     const comment = document.getElementById('review-comment').value;
-    
+
     fetch(`/api/orders/${orderId}/review`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
