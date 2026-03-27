@@ -137,48 +137,9 @@
     </div>
 </section>
 
-<section class="dashboard-grid dashboard-grid--split">
-    <article class="dashboard-card">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Operational rhythm</p>
-                <h3>Useful monthly signals</h3>
-            </div>
-        </div>
-        <div class="list-stack">
-            <div class="list-row">
-                <div>
-                    <strong>Busiest hour</strong>
-                    <p>Most active service window</p>
-                </div>
-                <!-- <div class="list-row__meta">
-                    <span>{{ monthly_overview.busiest_hour.label if monthly_overview.busiest_hour else "N/A" }}</span>
-                    <span>{{ monthly_overview.busiest_hour.count if monthly_overview.busiest_hour else 0 }} orders</span>
-                </div> -->
-            </div>
-            <div class="list-row">
-                <div>
-                    <strong>Best weekday</strong>
-                    <p>Highest revenue weekday overall</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>{{ monthly_overview.best_weekday.label if monthly_overview.best_weekday else "N/A" }}</span>
-                    <span>${{ "%.0f"|format(monthly_overview.best_weekday.revenue if monthly_overview.best_weekday else 0) }}</span>
-                </div>
-            </div>
-            <div class="list-row">
-                <div>
-                    <strong>Completion rate</strong>
-                    <p>Completed or ready orders for this window</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>{{ booking_completion_rate }}%</span>
-                </div>
-            </div>
-        </div>
-    </article>
+<section class="dashboard-grid dashboard-grid--single">
     <!-- ================= SALES TREND ================= -->
-    <article class="dashboard-card">
+    <article class="dashboard-card dashboard-card--fullspan">
         <div class="section-heading">
             <div>
                 <p class="eyebrow">Sales trend</p>
@@ -223,7 +184,7 @@
             <div class="scatter-chart__main">
                 <div class="scatter-chart__plot scatter-chart__plot--daily">
                     <svg class="scatter-chart__line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                        <polyline points="{% for item in data %}{{ (loop.index0 / n * 100)|round(2) }},{{ 100 - ((item.revenue / max_rev) * 90)|round(2) }}{% if not loop.last %},{% endif %}{% endfor %}" />
+                        <polyline points="{% for item in data %}{% set x_pos = ((loop.index0 / n) * 96 + 2)|round(2) %}{% set y_pos = (100 - ((item.revenue / max_rev) * 88))|round(2) %}{{ x_pos }},{{ y_pos }}{% if not loop.last %},{% endif %}{% endfor %}" stroke="#f97316" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" fill="none" />
                     </svg>
                 </div>
                 <div class="scatter-chart__labels scatter-chart__labels--absolute">
@@ -243,9 +204,6 @@
 
         <!-- ================= DAILY SUMMARY ================= -->
         {% if selected_period == 'daily' %}
-        <p class="metric-card__note">
-            {{ managed_cafe.operating_hours if managed_cafe else "Operating hours" }} revenue pattern.
-        </p>
         <div class="daily-chart-summary">
             <div class="daily-chart-summary__item">
                 <span class="daily-chart-summary__label">Today total</span>
@@ -266,7 +224,6 @@
             </div>
         </div>
     {% elif selected_period == 'weekly' %}
-        <p class="metric-card__note">{{ period_label }} revenue pattern.</p>
         <div class="weekly-chart-summary">
             <div class="weekly-chart-summary__item">
                 <span class="weekly-chart-summary__label">Week total</span>
@@ -287,7 +244,6 @@
             </div>
         </div>
     {% elif selected_period == 'monthly' %}
-        <p class="metric-card__note">{{ period_label }} revenue pattern.</p>
         <div class="monthly-chart-summary">
             <div class="monthly-chart-summary__item">
                 <span class="monthly-chart-summary__label">Month total</span>
@@ -402,47 +358,7 @@
 
 
 <section class="dashboard-grid dashboard-grid--split">
-    <article class="dashboard-card">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Bookings chart</p>
-                <h3>Past platform Orders</h3>
-            </div>
-            <!-- <div class="chart-toggle">
-                <button type="button" class="chart-toggle__link {% if chart_preferences.bookings == 'bar' %}chart-toggle__link--active{% endif %}" data-chart-toggle="bookings" data-chart-view="bar">Bar graph</button>
-                <button type="button" class="chart-toggle__link {% if chart_preferences.bookings == 'histogram' %}chart-toggle__link--active{% endif %}" data-chart-toggle="bookings" data-chart-view="histogram">Histogram</button>
-            </div> -->
-        </div>
-        {% set max_booking_count = weekly_booking_data | map(attribute='count') | max if weekly_booking_data else 0 %}
-        <div data-chart-panel="bookings" data-chart-view="histogram" class="{% if chart_preferences.bookings != 'histogram' %}is-hidden{% endif %}">
-            <div class="histogram-chart" style="grid-template-columns: repeat({{ weekly_booking_data|length }}, minmax(0, 1fr));">
-                {% for day in weekly_booking_data %}
-                <div class="histogram-chart__item">
-                    <div class="histogram-chart__bar-wrap">
-                        <div class="histogram-chart__bar histogram-chart__bar--bookings" style="height: {{ 18 if day.count == 0 else (day.count / (max_booking_count if max_booking_count else 1) * 160 + 18) | round(0, 'ceil') }}px;"></div>
-                    </div>
-                    <strong>{{ day.count }}</strong>
-                    <span>{{ day.label }}</span>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        <div data-chart-panel="bookings" data-chart-view="bar" class="{% if chart_preferences.bookings != 'bar' %}is-hidden{% endif %}">
-            <div class="landscape-chart-grid">
-                {% for day in weekly_booking_data %}
-                <div class="landscape-chart-card">
-                    <div class="landscape-chart-card__label">
-                        <strong>{{ day.label }}</strong>
-                        <span>{{ day.count }} orders</span>
-                    </div>
-                    <div class="landscape-chart-card__track">
-                        <div class="landscape-chart-card__fill landscape-chart-card__fill--bookings" style="width: {{ (day.count / (max_booking_count if max_booking_count else 1) * 100) | round(0, 'ceil') if day.count else 0 }}%;"></div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </article>
+   
 
     <article class="dashboard-card">
     <div class="section-heading">
@@ -480,12 +396,6 @@
         </tbody>
         </table>
     </div>
-    <div class="mt-3 p-2 bg-light rounded">
-        <small class="text-muted">
-        {{ item_bubble_data|length }} items • 
-        Total profit: <strong>${{ "%.0f"|format(item_bubble_data|sum(attribute='profit')) }}</strong>
-        </small>
-    </div>
     {% else %}
     <div class="text-center py-4">
         <div style="font-size: 3rem; opacity: 0.3;">📊</div>
@@ -494,7 +404,32 @@
     </div>
     {% endif %}
     </article>
-    
+    <article class="dashboard-card">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Production planning</p>
+                <h3>Suggested prep quantities</h3>
+            </div>
+        </div>
+        {% if demand_forecast %}
+        <div class="list-stack">
+            {% for item in demand_forecast %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ item.name }}</strong>
+                    <p>{{ item.period_units }} units sold in the {{ period_note }}</p>
+                </div>
+                <div class="list-row__meta">
+                    <span>Prep next cycle</span>
+                    <span>{{ item.suggested_qty }} portions</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">Forecast suggestions will appear once recent sales patterns exist.</p>
+        {% endif %}
+    </article>
 
 </section>
 
@@ -583,35 +518,76 @@
     </article>
     
 </section>
-
-
 <section class="dashboard-grid dashboard-grid--split">
-    <article class="dashboard-card">
+    <!-- Negative Reviews Count + Latest Reviews -->
+    <article class="dashboard-card dashboard-card--accent">
         <div class="section-heading">
             <div>
-                <p class="eyebrow">Production planning</p>
-                <h3>Suggested prep quantities</h3>
+                <p class="eyebrow">🚨 Sentiment Monitor</p>
+                <h3>Negative Reviews ({{ negative_reviews|length if negative_reviews else 0 }})</h3>
             </div>
         </div>
-        {% if demand_forecast %}
-        <div class="list-stack">
-            {% for item in demand_forecast %}
-            <div class="list-row">
-                <div>
-                    <strong>{{ item.name }}</strong>
-                    <p>{{ item.period_units }} units sold in the {{ period_note }}</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>Prep next cycle</span>
-                    <span>{{ item.suggested_qty }} portions</span>
-                </div>
+        {% if negative_reviews %}
+            <!-- Count card -->
+            <div class="metric-card metric-card--accent mb-4">
+                <p class="metric-card__label">1-2 star ratings</p>
+                <h2><span class="animated-counter" data-target="{{ negative_reviews|length }}">{{ negative_reviews|length }}</span></h2>
+                <p class="metric-card__note">{{ negative_reviews|length }} reviews in {{ period_note }}</p>
             </div>
-            {% endfor %}
-        </div>
+            
+            <!-- 5 Latest Reviews -->
+            <div class="review-stack">
+                <h5 class="mb-3">Latest 5:</h5>
+                {% for review in negative_reviews[:5] %}
+                <div class="list-row mb-2 pb-2 border-bottom">
+                    <div>
+                        <strong class="text-danger">{{ review.rating }}/5 ★</strong>
+                        <p class="mb-0 small">"{{ review.comment[:80] }}{% if review.comment|length > 80 %}..."{% endif %}</p>
+                    </div>
+                    <div class="list-row__meta text-muted small">
+                        {{ review.created_at.strftime('%b %d %H:%M') if review.created_at else 'Recent' }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         {% else %}
-        <p class="empty-state">Forecast suggestions will appear once recent sales patterns exist.</p>
+            <div class="text-center py-5">
+                <div style="font-size: 3rem; opacity: 0.3;">⭐⭐⭐⭐⭐</div>
+                <p class="mt-2">No negative reviews</p>
+                <small>Perfect satisfaction score!</small>
+            </div>
         {% endif %}
     </article>
+
+    <!-- Top Complaints -->
+    <article class="dashboard-card dashboard-card--warning">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Complaint Patterns</p>
+                <h3>Top Issues</h3>
+            </div>
+        </div>
+        {% if negative_reviews and negative_review_reasons %}
+            <div class="list-stack">
+                {% for reason in negative_review_reasons[:5] %}
+                <div class="list-row">
+                    <div>
+                        <strong>"{{ reason.reason }}"</strong>
+                        <p>{{ reason.count }} mentions ({{ reason.share|round(0) }}%)</p>
+                    </div>
+                    <div class="list-row__meta">
+                        <span class="badge bg-warning">{{ reason.share|round(0) }}%</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-state text-center py-4">Need 10+ negatives for patterns</p>
+        {% endif %}
+    </article>
+</section>
+
+<section class="dashboard-grid dashboard-grid--split">
 
     <article class="dashboard-card">
         <div class="section-heading">
@@ -634,10 +610,77 @@
         </div>
         {% endif %}
     </article>
+    <!-- SINGLE Promotions Article (Top-Bottom Layout) -->
+    <article class="dashboard-card dashboard-card--success dashboard-card--fullspan">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">🎉 Promotions Impact</p>
+                <h3>Voucher Campaigns & Quick Actions</h3>
+            </div>
+        </div>
+        
+        <div class="promo-section">
+            <!-- TOP: Stats -->
+            <div class="promo-stats-section mb-5">
+                <div class="metric-card metric-card--success">
+                    <p class="metric-card__label">Sales lift from vouchers</p>
+                    <h2><span id="promo-lift-counter" class="animated-counter" data-target="23">25</span>%</h2>
+                    <p class="metric-card__note">↑23% vs non-promo orders<br>147 redemptions by 89 customers</p>
+                </div>
+                <div class="row g-3 text-center mt-4">
+                    <div class="col-md-12">
+                        <strong>147</strong>
+                        <div class="d-block">Vouchers used</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- BOTTOM: Voucher Buttons -->
+            <div class="voucher-dropper-section text-center">
+                <p class="mb-4 fw-semibold fs-5">Send Vouchers for grabs!</p>
+                
+                <!-- 10% Button -->
+                <div class="mb-4">
+                    <button onclick="simulateVoucherDrop(10)" class="btn btn-outline-primary btn-lg px-5">
+                        💰 Send 10% OFF Vouchers
+                    </button>
+                </div>
+                
+                <!-- 20% Button -->
+                <div class="mb-3">
+                    <button onclick="simulateVoucherDrop(20)" class="btn btn-primary btn-lg px-5">
+                        🔥 Send 20% OFF Vouchers
+                    </button>
+                </div>
+                
+            </div>
+        </div>
+    </article>
 </section>
 {% endif %}
 
-
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    <div id="promo-toast" class="toast align-items-center text-dark bg-success border-0 shadow-lg" 
+         role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="false">
+        <div class="d-flex">
+            <div class="toast-body d-flex align-items-center">
+                <div class="me-3">
+                    <i class="bi bi-check-circle-fill fs-1 text-white"></i>
+                </div>
+                <div>
+                    <h5 class="mb-1">🎉 Vouchers Dropped Successfully!</h5>
+                    <p id="toast-message" class="mb-2">Sent <strong id="toast-discount"></strong> vouchers to 500 customers</p>
+                    <div class="small text-white-50">
+                        <i class="bi bi-clock me-1"></i>
+                        <span id="toast-expiry">Valid for 24 hours</span>
+                    </div>
+                    <small class="text-white-75">Code auto-generated • Track redemptions in Orders</small>
+                </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-3 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
 <script>
 function animateCounter(element, targetValue, options = {}) {
     const { duration = 1300, isCurrency = false } = options;
@@ -827,7 +870,45 @@ if (savedScroll !== null) {
         sessionStorage.removeItem(dashboardScrollKey);
     });
 }
-
+function simulateVoucherDrop(discountPct) {
+    const messages = {
+        10: "10% OFF (Code: GRAB10-ABCD)",
+        20: "20% OFF (Code: GRAB20-EFGH)"
+    };
+    
+    // Update toast content
+    document.getElementById('toast-discount').textContent = messages[discountPct];
+    document.getElementById('toast-expiry').textContent = 
+        new Date(Date.now() + 24*60*60*1000).toLocaleString('en-SG', {
+            weekday: 'short', 
+            hour: '2-digit', 
+            minute: '2-digit'
+        });
+    
+    // Show fancy toast
+    const toastEl = document.getElementById('promo-toast');
+    const toast = new bootstrap.Toast(toastEl, {
+        animation: true,
+        delay: 8000  // Auto-hide after 8s
+    });
+    toast.show();
+    
+    // Button loading animation
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    const originalClass = btn.className;
+    
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span><span>Sending...</span>';
+    btn.classList.add('disabled');
+    btn.disabled = true;
+    
+    // Reset button after 2s
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.className = originalClass;
+        btn.disabled = false;
+    }, 2000);
+}
 
 </script>
 {% if current_user.role == 'customer' %}

@@ -330,7 +330,66 @@ def seed_data(db: Session):
         (family_customer.id, cafe5.id, 5, "Great brunch portions and the bagel arrived neatly packed."),
         (office_customer.id, cafe6.id, 4, "Desserts are rich without being too heavy. Nice for sharing."),
         (customer.id, cafe7.id, 4, "Solid breakfast stop with comforting kopi and toast options."),
-    ]
+        # Cold food complaints (12 reviews)
+        (office_customer.id, cafe1.id, 1, "Coffee completely cold. 45 min late delivery."),
+        (customer.id, cafe1.id, 1, "Matcha latte ice cold when arrived."),
+        (repeat_customer.id, cafe1.id, 1, "Cappuccino lukewarm. Poor insulation."),
+        (family_customer.id, cafe1.id, 2, "Yuzu cold brew warm and flat."),
+        (office_customer.id, cafe1.id, 1, "Espresso room temperature. Ruined."),
+        (customer.id, cafe1.id, 2, "All drinks cold by delivery time."),
+        (repeat_customer.id, cafe1.id, 1, "Hot drinks always arrive cold."),
+        (family_customer.id, cafe1.id, 1, "Kaya toast cold and greasy."),
+        (office_customer.id, cafe1.id, 2, "Avocado toast fridge-cold."),
+        (customer.id, cafe1.id, 1, "Strawberry matcha separated and cold."),
+        (repeat_customer.id, cafe1.id, 1, "Burnt cheesecake cold center."),
+        (family_customer.id, cafe1.id, 2, "Croissants cold and chewy."),
+
+        # Small portions / expensive (10 reviews)
+        (office_customer.id, cafe1.id, 2, "Matcha latte tiny for $5.50. Ripoff."),
+        (customer.id, cafe1.id, 2, "Portions shrinking but prices same."),
+        (repeat_customer.id, cafe1.id, 1, "Avocado toast $7 for that little?"),
+        (family_customer.id, cafe1.id, 2, "Strawberry matcha mostly ice."),
+        (office_customer.id, cafe1.id, 1, "Croissant small and $2.50?!"),
+        (customer.id, cafe1.id, 2, "Overpriced for home-based quality."),
+        (repeat_customer.id, cafe1.id, 1, "Kaya toast skimpy on kaya."),
+        (family_customer.id, cafe1.id, 2, "Too expensive for portion size."),
+        (office_customer.id, cafe1.id, 1, "Yuzu drink half empty glass."),
+        (customer.id, cafe1.id, 2, "Prices up but quality down."),
+
+        # Late delivery (8 reviews)
+        (repeat_customer.id, cafe1.id, 1, "1hr 15min late. Food ruined."),
+        (family_customer.id, cafe1.id, 1, "Delivery 50min late. Cold food."),
+        (office_customer.id, cafe1.id, 2, "Always late during lunch rush."),
+        (customer.id, cafe1.id, 1, "Promised 30min, took 1hr 10min."),
+        (repeat_customer.id, cafe1.id, 2, "Late again. Unreliable service."),
+        (family_customer.id, cafe1.id, 1, "Hour late. Missed lunch break."),
+        (office_customer.id, cafe1.id, 2, "Delivery time estimates wrong."),
+        (customer.id, cafe1.id, 1, "45min late every single time."),
+
+        # Poor taste/quality (10 reviews)
+        (repeat_customer.id, cafe1.id, 2, "Matcha too sweet. Like syrup."),
+        (family_customer.id, cafe1.id, 1, "Kaya toast soggy. No flavor."),
+        (office_customer.id, cafe1.id, 2, "Avocado brown and tasteless."),
+        (customer.id, cafe1.id, 1, "Strawberry matcha tastes fake."),
+        (repeat_customer.id, cafe1.id, 2, "Croissants stale from morning."),
+        (family_customer.id, cafe1.id, 1, "Burnt cheesecake dry inside."),
+        (office_customer.id, cafe1.id, 2, "Espresso weak and bitter."),
+        (customer.id, cafe1.id, 1, "Yuzu no citrus taste at all."),
+        (repeat_customer.id, cafe1.id, 2, "Cappuccino no foam. Flat."),
+        (family_customer.id, cafe1.id, 1, "Kaya bitter and weird taste."),
+
+        # Packaging/damage (10 reviews)
+        (office_customer.id, cafe1.id, 1, "Croissants crushed in bag."),
+        (customer.id, cafe1.id, 2, "Bag leaked matcha everywhere."),
+        (repeat_customer.id, cafe1.id, 1, "Toast squashed flat."),
+        (family_customer.id, cafe1.id, 2, "Cheesecake spilled in container."),
+        (office_customer.id, cafe1.id, 1, "Drinks tipped over in delivery."),
+        (customer.id, cafe1.id, 2, "Poor packaging. All mixed up."),
+        (repeat_customer.id, cafe1.id, 1, "Bag torn. Items fell out."),
+        (family_customer.id, cafe1.id, 2, "Containers not sealed properly."),
+        (office_customer.id, cafe1.id, 1, "Avocado toast smashed."),
+        (customer.id, cafe1.id, 2, "Delivery bag soaked through.")
+        ]
     for user_id, cafe_id, rating, comment in demo_reviews:
         ensure_review(user_id, cafe_id, rating, comment)
 
@@ -1127,11 +1186,12 @@ async def dashboard(
                 "cafes": set(),
             }
         )
+        
         daily_revenue_map = {}
         daily_booking_map = {}
         customer_summary = {}
         category_sales = defaultdict(lambda: {"label": "", "quantity": 0, "revenue": 0.0})
-        operating_hours = get_operating_hour_slots(managed_cafe.operating_hours if managed_cafe else None)
+        operating_hours = get_operating_hour_slots(managed_cafe.operating_hours if managed_cafe else None)or list(range(8, 21))
         hourly_order_map = {
             hour: {"label": f"{hour:02d}00", "count": 0}
             for hour in operating_hours
@@ -1472,18 +1532,56 @@ async def dashboard(
             if platform_bookings
             else 0
         )
-        # Pre-compute bubble positions (safer than Jinja2 math)
-        max_profit = 1
-        max_qty = 1
-        if item_bubble_data:
-            max_profit = max(item_bubble_data, key=lambda x: x.get('profit', 1))['profit'] or 1
-            max_qty = max(item_bubble_data, key=lambda x: x.get('quantity', 1))['quantity'] or 1
-
-        # Add computed positions to each item
-        for item in item_bubble_data:
-            item['bubble_r'] = max(2, (item['profit'] / max_profit * 8))
-            item['bubble_x'] = 10 + (item['margin'] / 100 * 80)
-            item['bubble_y'] = 70 - (item['quantity'] / max_qty * 60)
+        # Negative reviews analysis - ADD THIS BLOCK
+        if current_user.role == 'vendor' and managed_cafe:
+            negative_reviews_raw = db.query(Review).filter(
+                Review.cafe_id == managed_cafe.id,
+                Review.rating <= 2
+            ).order_by(Review.created_at.desc()).limit(50).all()
+            
+            negative_reviews = negative_reviews_raw[:10]
+            print(f"DEBUG: Found {len(negative_reviews_raw)} negative reviews for cafe {managed_cafe.id}")
+            
+            # Extract complaint reasons for chart
+            complaint_keywords = {
+                "cold": "Arrived cold",
+                "late": "Delivery late", 
+                "small": "Portion too small",
+                "tiny": "Portion too small",
+                "price": "Too expensive",
+                "expensive": "Too expensive",
+                "soggy": "Too soggy",
+                "dry": "Too dry",
+                "stale": "Stale food",
+                "crush": "Crushed packaging",
+                "leak": "Leaked packaging",
+                "late": "Late delivery"
+            }
+            
+            reason_counter = {}
+            for review in negative_reviews_raw:
+                comment_lower = review.comment.lower() if review.comment else ""
+                for keyword, reason in complaint_keywords.items():
+                    if keyword in comment_lower:
+                        reason_counter[reason] = reason_counter.get(reason, 0) + 1
+                        break
+            
+            negative_review_reasons = [
+                {"reason": reason, "count": count, "share": round((count/len(negative_reviews_raw)*100), 1)}
+                for reason, count in sorted(reason_counter.items(), key=lambda x: x[1], reverse=True)[:5]
+            ]
+        else:
+            negative_reviews = []
+            negative_review_reasons = []
+        promo_stats = {
+            "lift_pct": 23.4,
+            "redemptions": 147,
+            "unique_users": 89,
+            "avg_order_value": 28.5
+        }
+        est_10pct_cost = 1250
+        est_20pct_cost = 2500
+        voucher_message = "Vouchers have been sent for grabs!"
 
 
         return templates.TemplateResponse(
@@ -1540,6 +1638,12 @@ async def dashboard(
                 "category_pie_style": category_pie_style,
                 "monthly_overview": monthly_overview,
                 "new_customers": new_customers,
+                "negative_reviews": negative_reviews,           # ← ADD THIS
+                "negative_review_reasons": negative_review_reasons,
+                "promo_stats": promo_stats,
+                "est_10pct_cost": est_10pct_cost,
+                "est_20pct_cost": est_20pct_cost,
+                "voucher_message": voucher_message,
             },
         )
     elif current_user.role == "customer":
