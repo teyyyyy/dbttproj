@@ -80,7 +80,7 @@ def seed_data(db: Session):
                 db.refresh(cafe)
         return cafe
 
-    def ensure_menu_item(cafe_id: int, name: str, description: str, price: float, category: str, is_available: bool = True):
+    def ensure_menu_item(cafe_id: int, name: str, description: str, price: float, category: str, is_available: bool = True, cost: float = 0.0):
         item = db.query(MenuItem).filter(MenuItem.cafe_id == cafe_id, MenuItem.name == name).first()
         if item is None:
             item = MenuItem(
@@ -90,6 +90,7 @@ def seed_data(db: Session):
                 price=price,
                 category=category,
                 is_available=is_available,
+                cost=cost,
             )
             db.add(item)
             db.commit()
@@ -184,7 +185,7 @@ def seed_data(db: Session):
         "Mon-Fri 8AM-6PM",
     )
     cafe2 = ensure_cafe(
-        vendor.id,
+        pastry_vendor.id,
         "Brew & Bites",
         "Fresh brews, rice bowls, and comfort food for busy customers.",
         "87 Beach Road, Singapore",
@@ -239,77 +240,83 @@ def seed_data(db: Session):
     )
 
     cozy_corner_items = [
-        ("Espresso", "Strong and bold coffee.", 3.50, "drink", True),
-        ("Cappuccino", "Espresso with steamed milk.", 4.00, "drink", True),
-        ("Matcha Latte", "Ceremonial-grade matcha with creamy milk.", 5.50, "drink", True),
-        ("Strawberry Matcha", "Layered strawberry puree with matcha milk.", 6.20, "drink", True),
-        ("Yuzu Cold Brew", "Bright citrus cold brew for warm afternoons.", 5.80, "drink", True),
-        ("Croissant", "Buttery, flaky pastry.", 2.50, "pastry", True),
-        ("Kaya Butter Toast", "Toasted bread with kaya and butter.", 4.80, "food", True),
-        ("Avocado Toast", "Toasted bread with avocado.", 7.00, "food", True),
-        ("Burnt Cheesecake Slice", "Creamy cheesecake with caramelised top.", 6.50, "dessert", False),
+        ("Espresso", "Strong and bold coffee.", 3.50, "drink", True, 1.20),
+        ("Cappuccino", "Espresso with steamed milk.", 4.00, "drink", True, 1.50),
+        ("Matcha Latte", "Ceremonial-grade matcha with creamy milk.", 5.50, "drink", True, 2.20),
+        ("Strawberry Matcha", "Layered strawberry puree with matcha milk.", 6.20, "drink", True, 2.80),
+        ("Yuzu Cold Brew", "Bright citrus cold brew for warm afternoons.", 5.80, "drink", True, 1.90),
+        ("Croissant", "Buttery, flaky pastry.", 2.50, "pastry", True, 1.00),
+        ("Kaya Butter Toast", "Toasted bread with kaya and butter.", 4.80, "food", True, 1.80),
+        ("Avocado Toast", "Toasted bread with avocado.", 7.00, "food", True, 3.50),
+        ("Burnt Cheesecake Slice", "Creamy cheesecake with caramelised top.", 6.50, "dessert", False, 3.20),
     ]
+
     brew_bites_items = [
-        ("Latte", "Smooth espresso with milk.", 4.50, "drink", True),
-        ("Americano", "Espresso diluted with water.", 3.00, "drink", True),
-        ("Iced Matcha Cloud", "Whipped cream topping over iced matcha.", 6.00, "drink", True),
-        ("Club Sandwich", "Turkey, bacon, lettuce, tomato.", 9.50, "food", True),
-        ("Miso Chicken Bowl", "Roasted chicken bowl with miso glaze.", 11.50, "food", True),
-        ("Truffle Egg Mayo Sando", "Japanese milk bread with egg mayo.", 8.20, "food", True),
-        ("Blueberry Muffin", "Blueberry muffin.", 3.00, "pastry", True),
-        ("Chocolate Financier", "Almond cake with dark chocolate.", 4.20, "dessert", True),
+        ("Latte", "Smooth espresso with milk.", 4.50, "drink", True, 1.60),
+        ("Americano", "Espresso diluted with water.", 3.00, "drink", True, 0.80),
+        ("Iced Matcha Cloud", "Whipped cream topping over iced matcha.", 6.00, "drink", True, 2.10),
+        ("Club Sandwich", "Turkey, bacon, lettuce, tomato.", 9.50, "food", True, 5.20),
+        ("Miso Chicken Bowl", "Roasted chicken bowl with miso glaze.", 11.50, "food", True, 6.50),
+        ("Truffle Egg Mayo Sando", "Japanese milk bread with egg mayo.", 8.20, "food", True, 3.80),
+        ("Blueberry Muffin", "Blueberry muffin.", 3.00, "pastry", True, 1.20),
+        ("Chocolate Financier", "Almond cake with dark chocolate.", 4.20, "dessert", True, 1.90),
     ]
+
     sunny_oven_items = [
-        ("Pain Au Chocolat", "Flaky laminated pastry with dark chocolate batons.", 5.20, "pastry", True),
-        ("Sea Salt Focaccia", "Rosemary focaccia with sea salt flakes.", 6.80, "food", True),
-        ("Burnt Honey Kouign Amann", "Caramelised Breton pastry with buttery layers.", 5.80, "pastry", True),
-        ("Iced White", "Double ristretto with cold milk over ice.", 5.00, "drink", True),
+        ("Pain Au Chocolat", "Flaky laminated pastry with dark chocolate batons.", 5.20, "pastry", True, 2.10),
+        ("Sea Salt Focaccia", "Rosemary focaccia with sea salt flakes.", 6.80, "food", True, 3.00),
+        ("Burnt Honey Kouign Amann", "Caramelised Breton pastry with buttery layers.", 5.80, "pastry", True, 2.40),
+        ("Iced White", "Double ristretto with cold milk over ice.", 5.00, "drink", True, 1.40),
     ]
+
     leaf_lane_items = [
-        ("Hojicha Latte", "Roasted tea latte with deep nutty notes.", 5.60, "drink", True),
-        ("Genmaicha Yuzu Soda", "Sparkling yuzu with toasted rice tea.", 6.20, "drink", True),
-        ("Tamago Sando", "Japanese egg sandwich on shokupan.", 7.50, "food", True),
-        ("Mochi Waffle", "Crisp mochi waffle with kinako dusting.", 8.80, "dessert", True),
+        ("Hojicha Latte", "Roasted tea latte with deep nutty notes.", 5.60, "drink", True, 2.00),
+        ("Genmaicha Yuzu Soda", "Sparkling yuzu with toasted rice tea.", 6.20, "drink", True, 2.30),
+        ("Tamago Sando", "Japanese egg sandwich on shokupan.", 7.50, "food", True, 3.20),
+        ("Mochi Waffle", "Crisp mochi waffle with kinako dusting.", 8.80, "dessert", True, 4.00),
     ]
+
     brunch_bureau_items = [
-        ("Truffle Scramble Toast", "Soft scrambled eggs with truffle on thick toast.", 12.50, "food", True),
-        ("Chicken Avo Bagel", "Grilled chicken bagel with avocado spread.", 11.80, "food", True),
-        ("Orange Cold Brew", "Cold brew brightened with orange tonic.", 6.00, "drink", True),
-        ("Banana Walnut Loaf", "House-baked loaf served warm.", 5.40, "dessert", True),
+        ("Truffle Scramble Toast", "Soft scrambled eggs with truffle on thick toast.", 12.50, "food", True, 6.80),
+        ("Chicken Avo Bagel", "Grilled chicken bagel with avocado spread.", 11.80, "food", True, 6.20),
+        ("Orange Cold Brew", "Cold brew brightened with orange tonic.", 6.00, "drink", True, 1.80),
+        ("Banana Walnut Loaf", "House-baked loaf served warm.", 5.40, "dessert", True, 2.40),
     ]
+
     moonwhisk_items = [
-        ("Pistachio Tart", "Buttery tart shell with pistachio cream.", 8.50, "dessert", True),
-        ("Dark Chocolate Brownie", "Fudgy brownie with flaky sea salt.", 5.20, "dessert", True),
-        ("Strawberry Milk", "Fresh strawberry milk in a bottled serve.", 4.80, "drink", True),
-        ("Vanilla Soft Serve Cup", "Classic soft serve with cookie crumble.", 6.00, "dessert", True),
+        ("Pistachio Tart", "Buttery tart shell with pistachio cream.", 8.50, "dessert", True, 3.80),
+        ("Dark Chocolate Brownie", "Fudgy brownie with flaky sea salt.", 5.20, "dessert", True, 2.00),
+        ("Strawberry Milk", "Fresh strawberry milk in a bottled serve.", 4.80, "drink", True, 1.70),
+        ("Vanilla Soft Serve Cup", "Classic soft serve with cookie crumble.", 6.00, "dessert", True, 2.50),
     ]
+
     harbor_toast_items = [
-        ("Kopi C", "Traditional kopi with evaporated milk.", 2.20, "drink", True),
-        ("Peanut Butter French Toast", "Sweet-savoury toast with peanut butter center.", 6.20, "food", True),
-        ("Turkey Melt", "Toasted sandwich with turkey and cheddar.", 8.90, "food", True),
-        ("Lemon Tea", "Brewed black tea with fresh lemon slices.", 3.20, "drink", True),
+        ("Kopi C", "Traditional kopi with evaporated milk.", 2.20, "drink", True, 0.70),
+        ("Peanut Butter French Toast", "Sweet-savoury toast with peanut butter center.", 6.20, "food", True, 2.80),
+        ("Turkey Melt", "Toasted sandwich with turkey and cheddar.", 8.90, "food", True, 4.50),
+        ("Lemon Tea", "Brewed black tea with fresh lemon slices.", 3.20, "drink", True, 0.90),
     ]
 
-    for item_name, description, price, category, is_available in cozy_corner_items:
-        ensure_menu_item(cafe1.id, item_name, description, price, category, is_available)
+    for item_name, description, price, category, is_available, cost in cozy_corner_items:
+        ensure_menu_item(cafe1.id, item_name, description, price, category, is_available,cost)
 
-    for item_name, description, price, category, is_available in brew_bites_items:
-        ensure_menu_item(cafe2.id, item_name, description, price, category, is_available)
+    for item_name, description, price, category, is_available, cost in brew_bites_items:
+        ensure_menu_item(cafe2.id, item_name, description, price, category, is_available,cost)
 
-    for item_name, description, price, category, is_available in sunny_oven_items:
-        ensure_menu_item(cafe3.id, item_name, description, price, category, is_available)
+    for item_name, description, price, category, is_available, cost in sunny_oven_items:
+        ensure_menu_item(cafe3.id, item_name, description, price, category, is_available,cost)
 
-    for item_name, description, price, category, is_available in leaf_lane_items:
-        ensure_menu_item(cafe4.id, item_name, description, price, category, is_available)
+    for item_name, description, price, category, is_available, cost in leaf_lane_items:
+        ensure_menu_item(cafe4.id, item_name, description, price, category, is_available,cost)
 
-    for item_name, description, price, category, is_available in brunch_bureau_items:
-        ensure_menu_item(cafe5.id, item_name, description, price, category, is_available)
+    for item_name, description, price, category, is_available, cost in brunch_bureau_items:
+        ensure_menu_item(cafe5.id, item_name, description, price, category, is_available,cost)
 
-    for item_name, description, price, category, is_available in moonwhisk_items:
-        ensure_menu_item(cafe6.id, item_name, description, price, category, is_available)
+    for item_name, description, price, category, is_available, cost in moonwhisk_items:
+        ensure_menu_item(cafe6.id, item_name, description, price, category, is_available,cost)
 
-    for item_name, description, price, category, is_available in harbor_toast_items:
-        ensure_menu_item(cafe7.id, item_name, description, price, category, is_available)
+    for item_name, description, price, category, is_available, cost in harbor_toast_items:
+        ensure_menu_item(cafe7.id, item_name, description, price, category, is_available,cost)
 
     demo_reviews = [
         (customer.id, cafe1.id, 5, "Love the matcha drinks here. The croissant was fresh too."),
@@ -1028,6 +1035,7 @@ async def login_post(request: Request, username: str = Form(...), password: str 
 async def dashboard(
     request: Request,
     period: str = "weekly",
+    cafe_filter: str = "all", 
     trend_chart: str = "bar",
     bookings_chart: str = "bar",
     category_chart: str = "pie",
@@ -1040,9 +1048,10 @@ async def dashboard(
         return RedirectResponse(url="/login", status_code=302)
     
     if current_user.role == "vendor":
-        cafes = db.query(Cafe).filter(Cafe.vendor_id == current_user.id).all()
         managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
-        cafe_ids = [c.id for c in cafes]
+        cafes = [managed_cafe] if managed_cafe else []  # Define cafes as single cafe list
+        cafe_ids = [managed_cafe.id] if managed_cafe else []
+        
         menu_items = db.query(MenuItem).filter(MenuItem.cafe_id.in_(cafe_ids)).all() if cafe_ids else []
         orders = (
             db.query(Order)
@@ -1213,6 +1222,27 @@ async def dashboard(
                 reverse=True,
             )[:5]
         )
+
+        # Compute ALL profits first
+        profit_items = []
+        for name, perf in item_performance.items():
+            if perf.get('quantity_sold', 0) > 0:
+                menu_item = next((mi for mi in menu_items if mi.name == name), None)
+                if menu_item and menu_item.cost > 0:
+                    total_revenue = perf['revenue']
+                    total_cost = perf['quantity_sold'] * menu_item.cost
+                    profit = total_revenue - total_cost
+                    margin = (profit / total_revenue * 100) if total_revenue > 0 else 0
+                    profit_items.append({
+                        'name': name,
+                        'margin': round(margin, 1),
+                        'quantity': perf['quantity_sold'],
+                        'profit': round(profit, 2),
+                        'revenue': round(total_revenue, 2)
+                    })
+
+        # SORT BY PROFIT DESC (highest first)
+        item_bubble_data = sorted(profit_items, key=lambda x: x['profit'], reverse=True)
 
         popular_items_today_counter = Counter()
         for order in todays_orders:
@@ -1401,6 +1431,11 @@ async def dashboard(
                 len([entry for entry in daily_revenue_map.values() if entry["revenue"] > 0]) if any(entry["revenue"] > 0 for entry in daily_revenue_map.values()) else 0, 2
             ),
         }
+        total_period_days = len([entry for entry in daily_revenue_map.values() if entry['revenue'] > 0])
+        avg_daily_revenue = (
+            sum(entry['revenue'] for entry in daily_revenue_map.values()) / total_period_days 
+            if total_period_days > 0 else 0
+        )
 
         # MONTHLY SUMMARY - same data source for now
         monthly_chart_summary = {
@@ -1419,7 +1454,7 @@ async def dashboard(
         busiest_hour = max(hourly_order_map.values(), key=lambda entry: entry["count"], default=None)
         best_weekday = max(weekday_revenue_map.values(), key=lambda entry: entry["revenue"], default=None)
         monthly_overview = {
-            "average_daily_revenue": round(period_revenue / period_days, 2) if period_days else 0,
+            "average_daily_revenue": round(avg_daily_revenue, 2),
             "best_sales_day": best_sales_day,
             "best_booking_day": best_booking_day,
             "busiest_hour": busiest_hour,
@@ -1437,6 +1472,19 @@ async def dashboard(
             if platform_bookings
             else 0
         )
+        # Pre-compute bubble positions (safer than Jinja2 math)
+        max_profit = 1
+        max_qty = 1
+        if item_bubble_data:
+            max_profit = max(item_bubble_data, key=lambda x: x.get('profit', 1))['profit'] or 1
+            max_qty = max(item_bubble_data, key=lambda x: x.get('quantity', 1))['quantity'] or 1
+
+        # Add computed positions to each item
+        for item in item_bubble_data:
+            item['bubble_r'] = max(2, (item['profit'] / max_profit * 8))
+            item['bubble_x'] = 10 + (item['margin'] / 100 * 80)
+            item['bubble_y'] = 70 - (item['quantity'] / max_qty * 60)
+
 
         return templates.TemplateResponse(
             "dashboard.html",
@@ -1450,6 +1498,7 @@ async def dashboard(
                 "total_orders": total_orders,
                 "total_revenue": total_revenue,
                 "popular_items": popular_items,
+                "item_bubble_data": item_bubble_data,
                 "todays_orders": len(todays_orders),
                 "weekly_revenue": period_revenue,
                 "period_revenue": period_revenue,
@@ -1496,7 +1545,16 @@ async def dashboard(
     elif current_user.role == "customer":
         orders = db.query(Order).filter(Order.customer_id == current_user.id).limit(5).all()
         points_balance = db.query(Point).filter(Point.user_id == current_user.id).count()  # Simplified
-        return templates.TemplateResponse("dashboard.html", {"request": request, "current_user": current_user, "orders": orders, "points_balance": points_balance})
+        chart_preferences = {}
+        item_bubble_data = []
+        return templates.TemplateResponse("dashboard.html", {
+            "request": request, 
+            "current_user": current_user, 
+            "orders": orders, 
+            "points_balance": points_balance,
+            "chart_preferences": chart_preferences,
+            "item_bubble_data": item_bubble_data,
+        })
 
 from sqlalchemy import text 
 @app.get("/db-dump-full")

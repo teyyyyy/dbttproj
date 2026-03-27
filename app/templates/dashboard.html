@@ -138,41 +138,45 @@
 </section>
 
 <section class="dashboard-grid dashboard-grid--split">
-
-    <!-- ================= MENU ANALYTICS ================= -->
     <article class="dashboard-card">
         <div class="section-heading">
             <div>
-                <p class="eyebrow">Menu analytics</p>
-                <h3>Best-performing items</h3>
+                <p class="eyebrow">Operational rhythm</p>
+                <h3>Useful monthly signals</h3>
             </div>
         </div>
-
-        {% if top_menu_items %}
         <div class="list-stack">
-            {% for item in top_menu_items %}
-            <div class="list-row popular-item-row popular-item-row--{{ loop.index }}">
+            <div class="list-row">
                 <div>
-                    <strong>{{ item.name }}</strong>
-                    <p>
-                        {{ item.category|capitalize }}
-                        {% if managed_cafe %} • {{ managed_cafe.name }}
-                        {% elif item.cafes %} • {{ item.cafes }}
-                        {% endif %}
-                    </p>
+                    <strong>Busiest hour</strong>
+                    <p>Most active service window</p>
+                </div>
+                <!-- <div class="list-row__meta">
+                    <span>{{ monthly_overview.busiest_hour.label if monthly_overview.busiest_hour else "N/A" }}</span>
+                    <span>{{ monthly_overview.busiest_hour.count if monthly_overview.busiest_hour else 0 }} orders</span>
+                </div> -->
+            </div>
+            <div class="list-row">
+                <div>
+                    <strong>Best weekday</strong>
+                    <p>Highest revenue weekday overall</p>
                 </div>
                 <div class="list-row__meta">
-                    <span>{{ item.quantity_sold }} sold</span>
-                    <span>${{ "%.2f"|format(item.revenue) }}</span>
+                    <span>{{ monthly_overview.best_weekday.label if monthly_overview.best_weekday else "N/A" }}</span>
+                    <span>${{ "%.0f"|format(monthly_overview.best_weekday.revenue if monthly_overview.best_weekday else 0) }}</span>
                 </div>
             </div>
-            {% endfor %}
+            <div class="list-row">
+                <div>
+                    <strong>Completion rate</strong>
+                    <p>Completed or ready orders for this window</p>
+                </div>
+                <div class="list-row__meta">
+                    <span>{{ booking_completion_rate }}%</span>
+                </div>
+            </div>
         </div>
-        {% else %}
-        <p class="empty-state">Once orders are placed, this section will highlight your best-selling menu items.</p>
-        {% endif %}
     </article>
-
     <!-- ================= SALES TREND ================= -->
     <article class="dashboard-card">
         <div class="section-heading">
@@ -312,87 +316,7 @@
 
 
 <section class="dashboard-grid dashboard-grid--split">
-    <article class="dashboard-card">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Monthly snapshot</p>
-                <h3>Rough business overview</h3>
-            </div>
-        </div>
-        <div class="list-stack">
-            <div class="list-row">
-                <div>
-                    <strong>Average daily revenue</strong>
-                    <p>Across the {{ period_note }}</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>${{ "%.2f"|format(monthly_overview.average_daily_revenue) }}</span>
-                </div>
-            </div>
-            <div class="list-row">
-                <div>
-                    <strong>Strongest sales day</strong>
-                    <p>Highest revenue day this month</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>{{ monthly_overview.best_sales_day.label if monthly_overview.best_sales_day else "N/A" }}</span>
-                    <span>${{ "%.0f"|format(monthly_overview.best_sales_day.revenue if monthly_overview.best_sales_day else 0) }}</span>
-                </div>
-            </div>
-            <div class="list-row">
-                <div>
-                    <strong>Busiest booking day</strong>
-                    <p>Highest order volume this month</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>{{ monthly_overview.best_booking_day.label if monthly_overview.best_booking_day else "N/A" }}</span>
-                    <span>{{ monthly_overview.best_booking_day.count if monthly_overview.best_booking_day else 0 }} orders</span>
-                </div>
-            </div>
-        </div>
-    </article>
 
-    <article class="dashboard-card">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Operational rhythm</p>
-                <h3>Useful monthly signals</h3>
-            </div>
-        </div>
-        <div class="list-stack">
-            <div class="list-row">
-                <div>
-                    <strong>Busiest hour</strong>
-                    <p>Most active service window</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>{{ monthly_overview.busiest_hour.label if monthly_overview.busiest_hour else "N/A" }}</span>
-                    <span>{{ monthly_overview.busiest_hour.count if monthly_overview.busiest_hour else 0 }} orders</span>
-                </div>
-            </div>
-            <div class="list-row">
-                <div>
-                    <strong>Best weekday</strong>
-                    <p>Highest revenue weekday overall</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>{{ monthly_overview.best_weekday.label if monthly_overview.best_weekday else "N/A" }}</span>
-                    <span>${{ "%.0f"|format(monthly_overview.best_weekday.revenue if monthly_overview.best_weekday else 0) }}</span>
-                </div>
-            </div>
-            <div class="list-row">
-                <div>
-                    <strong>Completion rate</strong>
-                    <p>Completed or ready orders for this window</p>
-                </div>
-                <div class="list-row__meta">
-                    <span>{{ booking_completion_rate }}%</span>
-                </div>
-            </div>
-        </div>
-    </article>
-</section>
-<section class="dashboard-grid dashboard-grid--split">
     <article class="dashboard-card">
         <div class="section-heading">
             <div>
@@ -400,13 +324,19 @@
                 <h3>Best-performing items</h3>
             </div>
         </div>
+
         {% if top_menu_items %}
         <div class="list-stack">
             {% for item in top_menu_items %}
             <div class="list-row popular-item-row popular-item-row--{{ loop.index }}">
                 <div>
                     <strong>{{ item.name }}</strong>
-                    <p>{{ item.category|capitalize }}{% if managed_cafe %} • {{ managed_cafe.name }}{% elif item.cafes %} • {{ item.cafes }}{% endif %}</p>
+                    <p>
+                        {{ item.category|capitalize }}
+                        {% if managed_cafe %} • {{ managed_cafe.name }}
+                        {% elif item.cafes %} • {{ item.cafes }}
+                        {% endif %}
+                    </p>
                 </div>
                 <div class="list-row__meta">
                     <span>{{ item.quantity_sold }} sold</span>
@@ -419,7 +349,7 @@
         <p class="empty-state">Once orders are placed, this section will highlight your best-selling menu items.</p>
         {% endif %}
     </article>
-    <article class="dashboard-card">
+     <article class="dashboard-card">
         <div class="section-heading">
             <div>
                 <p class="eyebrow">Category mix</p>
@@ -470,18 +400,18 @@
     </article>
 </section>
 
-{% else %}
+
 <section class="dashboard-grid dashboard-grid--split">
     <article class="dashboard-card">
         <div class="section-heading">
             <div>
                 <p class="eyebrow">Bookings chart</p>
-                <h3>{{ period_label }} platform bookings</h3>
+                <h3>Past platform Orders</h3>
             </div>
-            <div class="chart-toggle">
+            <!-- <div class="chart-toggle">
                 <button type="button" class="chart-toggle__link {% if chart_preferences.bookings == 'bar' %}chart-toggle__link--active{% endif %}" data-chart-toggle="bookings" data-chart-view="bar">Bar graph</button>
                 <button type="button" class="chart-toggle__link {% if chart_preferences.bookings == 'histogram' %}chart-toggle__link--active{% endif %}" data-chart-toggle="bookings" data-chart-view="histogram">Histogram</button>
-            </div>
+            </div> -->
         </div>
         {% set max_booking_count = weekly_booking_data | map(attribute='count') | max if weekly_booking_data else 0 %}
         <div data-chart-panel="bookings" data-chart-view="histogram" class="{% if chart_preferences.bookings != 'histogram' %}is-hidden{% endif %}">
@@ -515,54 +445,57 @@
     </article>
 
     <article class="dashboard-card">
-        <div class="section-heading">
-            <div>
-                <p class="eyebrow">Category mix</p>
-                <h3>What customers are buying</h3>
-            </div>
-            <div class="chart-toggle">
-                <button type="button" class="chart-toggle__link {% if chart_preferences.category == 'bar' %}chart-toggle__link--active{% endif %}" data-chart-toggle="category" data-chart-view="bar">Bar graph</button>
-                <button type="button" class="chart-toggle__link {% if chart_preferences.category == 'pie' %}chart-toggle__link--active{% endif %}" data-chart-toggle="category" data-chart-view="pie">Pie chart</button>
-            </div>
+    <div class="section-heading">
+        <div>
+        <p class="eyebrow mb-1">Earnings per item</p>
+        <h3>Profit analysis</h3>
         </div>
-        {% if category_sales_data %}
-        <div data-chart-panel="category" data-chart-view="pie" class="{% if chart_preferences.category != 'pie' %}is-hidden{% endif %}">
-            <div class="pie-chart-layout">
-                <div class="pie-chart-visual" style="background: {{ category_pie_style }};"></div>
-                <div class="pie-chart-legend">
-                    {% for category in category_sales_data %}
-                    <div class="pie-chart-legend__item">
-                        <span class="pie-chart-legend__swatch" style="background: {{ category.color }};"></span>
-                        <div>
-                            <strong>{{ category.label }}</strong>
-                            <p>{{ category.quantity }} items • {{ "%.0f"|format(category.share) }}%</p>
-                        </div>
-                        <strong>${{ "%.2f"|format(category.revenue) }}</strong>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-        <div data-chart-panel="category" data-chart-view="bar" class="{% if chart_preferences.category != 'bar' %}is-hidden{% endif %}">
-            <div class="category-chart">
-                {% for category in category_sales_data %}
-                <div class="category-chart__row">
-                    <div class="category-chart__label">
-                        <strong>{{ category.label }}</strong>
-                        <span>{{ category.quantity }} items</span>
-                    </div>
-                    <div class="category-chart__track">
-                        <div class="category-chart__fill" style="width: {{ (category.quantity / category_sales_data[0].quantity * 100) | round(0, 'ceil') if category_sales_data[0].quantity else 0 }}%;"></div>
-                    </div>
-                    <strong class="category-chart__value">${{ "%.2f"|format(category.revenue) }}</strong>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% else %}
-        <p class="empty-state">Category performance will populate after more orders are placed.</p>
-        {% endif %}
+    </div>
+    {% if item_bubble_data %}
+    <div class="table-responsive">
+        <table class="table table-sm">
+        <thead class="table-dark">
+            <tr>
+            <th>Item</th>
+            <th>Margin</th>
+            <th>Qty Sold</th>
+            <th>Profit</th>
+            <th>Revenue</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in item_bubble_data[:10] %}
+            <tr>
+            <td><strong>{{ item.name }}</strong></td>
+            <td>
+                <span class="badge {{ 'bg-success' if item.margin > 60 else 'bg-warning' if item.margin > 40 else 'bg-secondary' }}">
+                {{ item.margin }}%
+                </span>
+            </td>
+            <td>{{ item.quantity }}</td>
+            <td class="fw-bold text-success">${{ "%.1f"|format(item.profit) }}</td>
+            <td class="text-muted">${{ "%.1f"|format(item.revenue) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        </table>
+    </div>
+    <div class="mt-3 p-2 bg-light rounded">
+        <small class="text-muted">
+        {{ item_bubble_data|length }} items • 
+        Total profit: <strong>${{ "%.0f"|format(item_bubble_data|sum(attribute='profit')) }}</strong>
+        </small>
+    </div>
+    {% else %}
+    <div class="text-center py-4">
+        <div style="font-size: 3rem; opacity: 0.3;">📊</div>
+        <p class="mt-2 mb-1">No profit data yet</p>
+        <small class="text-muted">Add <code>cost</code> to menu items</small>
+    </div>
+    {% endif %}
     </article>
+    
+
 </section>
 
 <section class="dashboard-grid dashboard-grid--split">
@@ -572,10 +505,10 @@
                 <p class="eyebrow">Order timing</p>
                 <h3>Busiest hours</h3>
             </div>
-            <div class="chart-toggle">
+            <!-- <div class="chart-toggle">
                 <button type="button" class="chart-toggle__link {% if chart_preferences.timing == 'bar' %}chart-toggle__link--active{% endif %}" data-chart-toggle="timing" data-chart-view="bar">Bar graph</button>
                 <button type="button" class="chart-toggle__link {% if chart_preferences.timing == 'histogram' %}chart-toggle__link--active{% endif %}" data-chart-toggle="timing" data-chart-view="histogram">Histogram</button>
-            </div>
+            </div> -->
         </div>
         {% set max_hour_count = hourly_order_data | map(attribute='count') | max if hourly_order_data else 0 %}
         <div data-chart-panel="timing" data-chart-view="histogram" class="{% if chart_preferences.timing != 'histogram' %}is-hidden{% endif %}">
@@ -607,17 +540,16 @@
             </div>
         </div>
     </article>
-
     <article class="dashboard-card">
         <div class="section-heading">
             <div>
                 <p class="eyebrow">Weekday revenue</p>
                 <h3>Best days to sell</h3>
             </div>
-            <div class="chart-toggle">
+            <!-- <div class="chart-toggle">
                 <button type="button" class="chart-toggle__link {% if chart_preferences.weekday == 'bar' %}chart-toggle__link--active{% endif %}" data-chart-toggle="weekday" data-chart-view="bar">Bar graph</button>
                 <button type="button" class="chart-toggle__link {% if chart_preferences.weekday == 'histogram' %}chart-toggle__link--active{% endif %}" data-chart-toggle="weekday" data-chart-view="histogram">Histogram</button>
-            </div>
+            </div> -->
         </div>
         {% set max_weekday_revenue = weekday_revenue_data | map(attribute='revenue') | max if weekday_revenue_data else 0 %}
         <div data-chart-panel="weekday" data-chart-view="histogram" class="{% if chart_preferences.weekday != 'histogram' %}is-hidden{% endif %}">
@@ -649,8 +581,9 @@
             </div>
         </div>
     </article>
+    
 </section>
-{% endif %}
+
 
 <section class="dashboard-grid dashboard-grid--split">
     <article class="dashboard-card">
@@ -702,6 +635,7 @@
         {% endif %}
     </article>
 </section>
+{% endif %}
 
 
 <script>

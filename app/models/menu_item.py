@@ -15,3 +15,4 @@ class MenuItem(Base):
     image_url = Column(String, nullable=True)
 
     cafe = relationship("Cafe", back_populates="menu_items")
+    cost = Column(Float, default=0.0, nullable=False)
