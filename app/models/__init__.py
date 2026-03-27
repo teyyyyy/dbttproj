@@ -5,4 +5,5 @@ from .order import Order, OrderItem
 from .point import Point
 from .review import Review
 from .favorite import Favorite
+from .message import Message
 from ..utils.database import Base

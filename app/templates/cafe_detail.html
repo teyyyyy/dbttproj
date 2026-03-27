@@ -8,11 +8,14 @@
         <div class="mb-3 d-flex justify-content-between align-items-center">
             <a href="/cafes" class="btn btn-outline-secondary">Back to Cafes</a>
             {% if current_user and current_user.role == 'customer' %}
-            <button
-                class="btn {% if is_favorited %}btn-danger text-white{% else %}btn-outline-danger{% endif %} rounded-pill px-4 shadow-sm"
-                onclick="toggleFavorite('{{ cafe.id }}', this)">
-                {% if is_favorited %}❤️ Favorited{% else %}🤍 Favorite Shop{% endif %}
-            </button>
+            <div>
+                <a href="/messages?cafe_id={{ cafe.id }}&cafe_name={{ cafe.name|urlencode }}" class="btn btn-outline-primary rounded-pill px-4 shadow-sm me-2">💬 Chat</a>
+                <button
+                    class="btn {% if is_favorited %}btn-danger text-white{% else %}btn-outline-danger{% endif %} rounded-pill px-4 shadow-sm"
+                    onclick="toggleFavorite('{{ cafe.id }}', this)">
+                    {% if is_favorited %}❤️ Favorited{% else %}🤍 Favorite{% endif %}
+                </button>
+            </div>
             {% endif %}
         </div>
         <h1>{{ cafe.name }}</h1>

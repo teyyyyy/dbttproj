@@ -12,9 +12,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
-from app.routes import auth, cafes, orders, admin
+from app.routes import auth, cafes, orders, admin, chat
 from app.utils.database import engine, Base, get_db, SessionLocal
-from app.models import User, Cafe, MenuItem, Order, OrderItem, Point, Review, Favorite
+from app.models import User, Cafe, MenuItem, Order, OrderItem, Point, Review, Favorite, Message
 from app.utils.auth import get_current_user
 
 # Create database tables
@@ -713,6 +713,7 @@ templates.env.globals["menu_item_image_url"] = lambda item_name, category='food'
 app.include_router(cafes.router, prefix="/api/cafes", tags=["Cafes"])
 app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 
 def get_current_user_optional(request: Request, db: Session = Depends(get_db)):
     role = request.cookies.get("role", "customer")
@@ -1620,7 +1621,13 @@ async def checkout(request: Request, current_user: User = Depends(get_current_us
     discount = points_applied / 100.0
     final_total = max(0, total - discount)
 
-    order = Order(customer_id=current_user.id, cafe_id=cafe_id, total_amount=final_total, delivery_address=delivery_address)
+    order = Order(
+        customer_id=current_user.id, 
+        cafe_id=cafe_id, 
+        total_amount=final_total, 
+        delivery_address=delivery_address,
+        status="delivered"
+    )
     db.add(order)
     db.flush()
     for oi in order_items:
@@ -1815,3 +1822,42 @@ async def unfavorite_cafe(
         db.delete(existing)
         db.commit()
     return {"status": "success"}
+
+@app.get("/messages", response_class=HTMLResponse)
+async def messages_page(request: Request, current_user: User = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+    
+    if current_user.role == "customer":
+        threads_q = db.query(Message.cafe_id.label('id'), Cafe.name).join(Cafe, Message.cafe_id == Cafe.id).filter(Message.sender_id == current_user.id).distinct()
+    else:
+        threads_q = db.query(Message.sender_id.label('id'), User.full_name.label('name')).join(User, Message.sender_id == User.id).filter(Message.receiver_id == current_user.id).distinct()
+    
+    threads = []
+    for t in threads_q:
+        if current_user.role == "customer":
+            latest = db.query(Message).filter(Message.cafe_id == t.id, Message.sender_id == current_user.id).order_by(Message.timestamp.desc()).first()
+            if not latest:
+                latest = db.query(Message).filter(Message.cafe_id == t.id, Message.receiver_id == current_user.id).order_by(Message.timestamp.desc()).first()
+        else:
+            latest = db.query(Message).filter(Message.sender_id == t.id, Message.receiver_id == current_user.id).order_by(Message.timestamp.desc()).first()
+            if not latest:
+                latest = db.query(Message).filter(Message.receiver_id == t.id, Message.sender_id == current_user.id).order_by(Message.timestamp.desc()).first()
+                
+        unread = db.query(Message).filter(Message.receiver_id == current_user.id, Message.is_read == False)
+        if current_user.role == "customer":
+            unread = unread.filter(Message.cafe_id == t.id)
+        else:
+            unread = unread.filter(Message.sender_id == t.id)
+            
+        threads.append({
+            "id": t.id,
+            "name": t.name,
+            "latest_msg": latest.content if latest else "",
+            "timestamp": latest.timestamp.strftime("%b %d, %I:%M %p") if latest else "",
+            "unread": unread.count() > 0,
+            "cafe_id": latest.cafe_id if latest else None
+        })
+        
+    threads.sort(key=lambda x: x['timestamp'], reverse=True)
+    return templates.TemplateResponse("messages.html", {"request": request, "current_user": current_user, "threads": threads})

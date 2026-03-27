@@ -25,6 +25,7 @@
                     {% else %}
                     <li class="nav-item"><a class="nav-link {% if request.url.path.startswith('/orders') %}active fw-bold{% endif %}" href="/orders">Orders</a></li>
                     {% endif %}
+                    <li class="nav-item"><a class="nav-link {% if request.url.path.startswith('/messages') %}active fw-bold{% endif %}" href="/messages">Messages</a></li>
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
