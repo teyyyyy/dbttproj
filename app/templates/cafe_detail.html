@@ -2,6 +2,10 @@
 
 {% block title %}{{ cafe.name }} - Café Discovery{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-md-8">
@@ -24,8 +28,11 @@
         <p><strong>Operating Hours:</strong> {{ cafe.operating_hours }}</p>
         <div class="mb-3">
             <h5>Location Map</h5>
-            <img src="https://via.placeholder.com/400x300/cccccc/000000?text=Map+of+{{ cafe.name | urlencode }}"
-                alt="Map" class="img-fluid">
+            {% if cafe.latitude and cafe.longitude %}
+            <div id="cafe-map" style="height: 300px; border-radius: 8px; z-index: 1;"></div>
+            {% else %}
+            <div class="alert alert-secondary text-center">Location data not available for this cafe.</div>
+            {% endif %}
         </div>
 
         <h2>Menu</h2>
@@ -148,5 +155,30 @@
             window.location.href = `/checkout?cafe_id=${cafeId}`;
         });
     }
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+    {% if cafe.latitude and cafe.longitude %}
+    document.addEventListener('DOMContentLoaded', function() {
+        var lat = {{ cafe.latitude }};
+        var lng = {{ cafe.longitude }};
+        var cafeName = {{ cafe.name | tojson | safe }};
+        var cafeAddress = {{ cafe.address | tojson | safe }};
+        
+        var map = L.map('cafe-map').setView([lat, lng], 15);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        L.marker([lat, lng]).addTo(map)
+            .bindPopup("<b>" + cafeName + "</b><br>" + cafeAddress)
+            .openPopup();
+    });
+    {% endif %}
 </script>
 {% endblock %}
