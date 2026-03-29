@@ -171,7 +171,8 @@
         {% set data = hourly_revenue_points if selected_period == 'daily' else weekly_sales_data %}
         {% set max_rev = data | map(attribute='revenue') | max if data else 1000 %}
         {% set n = (data|length - 1) if data|length > 1 else 1 %}
-
+        {% set has_revenue = (data | map(attribute='revenue') | max) > 0 if data else false %}
+        {% if has_revenue %}
         <div class="scatter-chart scatter-chart--with-axis scatter-chart--daily">
             <div class="scatter-chart__axis scatter-chart__axis--daily">
                 <span>${{ "%.0f"|format(max_rev|round) }}</span>
@@ -200,6 +201,25 @@
                 </div>
             </div>
         </div>
+        {% else %}
+        <div class="scatter-chart scatter-chart--daily" style="
+            height:260px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            text-align:center;
+            color:#6b7280;
+        ">
+            <div>
+                <p style="font-weight:600; margin-bottom:4px;">
+                    No revenue recorded today
+                </p>
+                <p style="font-size:0.9em;">
+                    Sales data will appear once orders are made.
+                </p>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
         <!-- ================= DAILY SUMMARY ================= -->
