@@ -10,15 +10,187 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import joinedload
 from app.routes import auth, cafes, orders, admin, chat
 from app.utils.database import engine, Base, get_db, SessionLocal
-from app.models import User, Cafe, MenuItem, Order, OrderItem, Point, Review, Favorite, Message
+from app.models import User, Cafe, MenuItem, Order, OrderItem, Point, Review, ComplaintKeyword, Favorite, Message
 from app.utils.auth import get_current_user
+
+# from transformers-based sentiment API, optional
+sentiment_analyzer = None
+try:
+    from transformers import pipeline
+
+    sentiment_analyzer = pipeline(
+        "sentiment-analysis",
+        model="distilbert-base-uncased-finetuned-sst-2-english",
+        device=-1,
+    )
+except Exception:
+    sentiment_analyzer = None
+
+DEFAULT_SEED_KEYWORDS = {
+    "cold": "Arrived cold",
+    "late": "Late delivery",
+    "small": "Portion too small",
+    "tiny": "Portion too small",
+    "price": "Too expensive",
+    "expensive": "Too expensive",
+    "soggy": "Too soggy",
+    "dry": "Too dry",
+    "stale": "Stale food",
+    "crush": "Crushed packaging",
+    "leak": "Leaked packaging",
+}
+
+STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "the",
+    "to",
+    "of",
+    "for",
+    "in",
+    "on",
+    "with",
+    "but",
+    "or",
+    "so",
+    "at",
+    "as",
+    "by",
+    "is",
+    "it",
+    "be",
+    "this",
+    "that",
+}
+
+
+def is_comment_negative(comment: str) -> bool:
+    comment = (comment or "").strip()
+    if not comment:
+        return False
+
+    if sentiment_analyzer is None:
+        return True
+
+    try:
+        result = sentiment_analyzer(comment[:512])[0]
+        if result.get("label") in {"NEGATIVE", "LABEL_0"}:
+            return True
+        return False
+    except Exception:
+        return True
+
+
+def normalize_keywords(db: Session) -> dict[str, str]:
+    keywords = {ck.keyword.lower(): ck.category for ck in db.query(ComplaintKeyword).all()}
+    if not keywords:
+        # initial seed fallback
+        keywords = {k: v for k, v in DEFAULT_SEED_KEYWORDS.items()}
+    return keywords
+
+
+def extract_keywords_from_comment(comment: str) -> list[str]:
+    if not comment:
+        return []
+    tokens = re.findall(r"\b[\w']+\b", comment.lower())
+    candidate_tokens = [token for token in tokens if token not in STOP_WORDS and len(token) > 2 and not token.isdigit()]
+    return candidate_tokens
+
+
+def extract_candidate_phrases(comment: str) -> list[str]:
+    tokens = extract_keywords_from_comment(comment)
+    phrases = []
+    # unigram + bigram to capture words like "bad service"
+    phrases.extend(tokens)
+    for i in range(len(tokens) - 1):
+        bigram = f"{tokens[i]} {tokens[i+1]}"
+        phrases.append(bigram)
+    return phrases
+
+
+def auto_discover_complaint_keywords(db: Session, reviews: list[Review], min_share: float = 0.05) -> None:
+    if not reviews:
+        return
+    total = len(reviews)
+    existing_keywords = set(normalize_keywords(db).keys())
+    candidate_counts = Counter()
+
+    for review in reviews:
+        if not review.comment or review.rating is None or review.rating > 2:
+            continue
+        if not is_comment_negative(review.comment):
+            continue
+        candidates = extract_candidate_phrases(review.comment)
+        candidate_counts.update(candidates)
+
+    # prioritize multi-word phrase injection first
+    for candidate, count in candidate_counts.most_common():
+        if candidate in existing_keywords:
+            continue
+        share = count / total
+        if share < min_share:
+            continue
+        category_name = candidate.title()
+        try:
+            new_keyword = ComplaintKeyword(keyword=candidate, category=category_name)
+            db.add(new_keyword)
+            db.flush()
+            existing_keywords.add(candidate)
+        except Exception:
+            db.rollback()
+
+
+def infer_complaint_category(db: Session, rating: Optional[float], comment: Optional[str]) -> Optional[str]:
+    if rating is None or rating > 2:
+        return None
+    if not comment:
+        return "Other"
+
+    sentiment_negative = is_comment_negative(comment)
+    if sentiment_analyzer is not None and not sentiment_negative:
+        # If classifier says not negative, still capture as fallback in `Other` for 1/2-star ratings.
+        return "Other"
+
+    comment_text = comment.lower()
+
+    # Explicit priority phrase handling to prevent 'Other' or generic phrase domination
+    priority_phrases = ["bad service"]
+    for phrase in priority_phrases:
+        if phrase in comment_text:
+            return phrase.title()
+
+    keywords = normalize_keywords(db)
+    # Prefer longer keyword matches (phrases) over single words
+    for keyword in sorted(keywords.keys(), key=lambda k: -len(k)):
+        pattern = rf"\b{re.escape(keyword)}\b"
+        if re.search(pattern, comment_text):
+            return keywords[keyword]
+    return "Other"
+
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Ensure complaint_category column exists when schema is older
+with engine.begin() as conn:
+    inspector = inspect(conn)
+    if "reviews" in inspector.get_table_names():
+        review_columns = [col["name"] for col in inspector.get_columns("reviews")]
+        if "complaint_category" not in review_columns:
+            conn.execute(text("ALTER TABLE reviews ADD COLUMN complaint_category TEXT"))
+
+# Seed complaint keyword master data (DB-driven, initial values)
+with SessionLocal() as db:
+    for keyword, category in DEFAULT_SEED_KEYWORDS.items():
+        existing = db.query(ComplaintKeyword).filter(ComplaintKeyword.keyword == keyword).first()
+        if not existing:
+            db.add(ComplaintKeyword(keyword=keyword, category=category))
+    db.commit()
 
 # Seed sample data
 def seed_data(db: Session):
@@ -158,7 +330,14 @@ def seed_data(db: Session):
             .first()
         )
         if review is None:
-            review = Review(user_id=user_id, cafe_id=cafe_id, rating=rating, comment=comment)
+            complaint_category = infer_complaint_category(db, rating, comment)
+            review = Review(
+                user_id=user_id,
+                cafe_id=cafe_id,
+                rating=rating,
+                comment=comment,
+                complaint_category=complaint_category,
+            )
             db.add(review)
             db.commit()
             db.refresh(review)
@@ -815,6 +994,15 @@ cleanup_duplicate_menu_items(SessionLocal())
 cleanup_duplicate_reviews(SessionLocal())
 cleanup_legacy_demo_reviews(SessionLocal())
 cleanup_legacy_demo_user_names(SessionLocal())
+
+# Backfill complaint categories for existing negative reviews (1-2 stars)
+db_for_backfill = SessionLocal()
+for review in db_for_backfill.query(Review).filter(Review.complaint_category.is_(None), Review.rating <= 2).all():
+    review.complaint_category = infer_complaint_category(db_for_backfill, review.rating, review.comment)
+    db_for_backfill.add(review)
+if db_for_backfill.dirty:
+    db_for_backfill.commit()
+db_for_backfill.close()
 
 app = FastAPI(title="Café Discovery Platform", version="1.0.0")
 
@@ -1626,35 +1814,36 @@ async def dashboard(
             
             negative_reviews = negative_reviews_raw[:10]
             print(f"DEBUG: Found {len(negative_reviews_raw)} negative reviews for cafe {managed_cafe.id}")
-            
-            # Extract complaint reasons for chart
-            complaint_keywords = {
-                "cold": "Arrived cold",
-                "late": "Delivery late", 
-                "small": "Portion too small",
-                "tiny": "Portion too small",
-                "price": "Too expensive",
-                "expensive": "Too expensive",
-                "soggy": "Too soggy",
-                "dry": "Too dry",
-                "stale": "Stale food",
-                "crush": "Crushed packaging",
-                "leak": "Leaked packaging",
-                "late": "Late delivery"
-            }
-            
+
+            # Discover new strong complaint keywords (>=5% frequency)
+            auto_discover_complaint_keywords(db, negative_reviews_raw, min_share=0.05)
+
             reason_counter = {}
             for review in negative_reviews_raw:
-                comment_lower = review.comment.lower() if review.comment else ""
-                for keyword, reason in complaint_keywords.items():
-                    if keyword in comment_lower:
-                        reason_counter[reason] = reason_counter.get(reason, 0) + 1
-                        break
-            
+                if not review.complaint_category:
+                    inferred = infer_complaint_category(db, review.rating, review.comment or "")
+                    if inferred and inferred != "Other":
+                        review.complaint_category = inferred
+                        db.add(review)
+                    reason = inferred
+                else:
+                    reason = review.complaint_category
+
+                if not reason or reason == "Other":
+                    continue
+                reason_counter[reason] = reason_counter.get(reason, 0) + 1
+
+            if db.dirty:
+                db.commit()
+
             negative_review_reasons = [
-                {"reason": reason, "count": count, "share": round((count/len(negative_reviews_raw)*100), 1)}
+                {"reason": reason, "count": count, "share": round((count / len(negative_reviews_raw) * 100), 1)}
                 for reason, count in sorted(reason_counter.items(), key=lambda x: x[1], reverse=True)[:5]
             ]
+
+            # If we filtered all out, keep an empty list to avoid showing Other in table
+            if not negative_review_reasons:
+                negative_review_reasons = []
         else:
             negative_reviews = []
             negative_review_reasons = []
@@ -2109,13 +2298,27 @@ async def create_review(order_id: int, review_in: ReviewCreate, current_user: Us
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
         
-    # For this prototype we will note it on the order notes.
+    # Save review record in table (and also keep order notes for legacy behavior)
+    review_text = review_in.comment or ""
+    complaint_category = infer_complaint_category(db, review_in.rating, review_text)
+
+    review = Review(
+        user_id=current_user.id,
+        cafe_id=order.cafe_id,
+        rating=review_in.rating,
+        comment=review_text,
+        complaint_category=complaint_category,
+    )
+    db.add(review)
+
     if order.notes:
-        order.notes += f"\nReview: {review_in.rating}/5 - {review_in.comment}"
+        order.notes += f"\nReview: {review_in.rating}/5 - {review_text}"
     else:
-        order.notes = f"Review: {review_in.rating}/5 - {review_in.comment}"
+        order.notes = f"Review: {review_in.rating}/5 - {review_text}"
+
     db.commit()
-    
+    db.refresh(review)
+
     return {"status": "success", "message": "Review added"}
 
 
