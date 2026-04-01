@@ -920,6 +920,18 @@ def get_order_status_context(role: str):
     }
 
 
+def exponential_smoothing_forecast(daily_counts: list[int], alpha: float = 0.3, lookahead_days: int = 1) -> float:
+    """Forecast future demand using single exponential smoothing."""
+    if not daily_counts:
+        return 0.0
+
+    level = float(daily_counts[0])
+    for value in daily_counts[1:]:
+        level = alpha * value + (1 - alpha) * level
+
+    return max(0.0, level * lookahead_days)
+
+
 def build_order_analytics(orders: list[Order]):
     total_orders = len(orders)
     total_revenue = sum(order.total_amount for order in orders)
@@ -1406,7 +1418,7 @@ async def dashboard(
         selected_period = period if period in allowed_periods else "weekly"
         period_days = allowed_periods[selected_period]
         period_start = (
-            datetime(now.year, now.month, 1)
+            now - timedelta(days=30)
             if selected_period == "monthly"
             else now - timedelta(days=period_days)
         )
@@ -1414,7 +1426,7 @@ async def dashboard(
         period_note_map = {
             "daily": "last 24 hours",
             "weekly": "last 7 days",
-            "monthly": now.strftime("%B %Y"),
+            "monthly": "last 30 days",
         }
         period_label = period_label_map[selected_period]
         period_note = period_note_map[selected_period]
@@ -1507,7 +1519,10 @@ async def dashboard(
             weekday_revenue_map[order.order_time.weekday()]["revenue"] += order.total_amount
 
         # Build CRM from all orders (lifetime view), not only period-specific subset.
-        for order in orders:
+        # Use period-specific orders for performance and forecast calculations.
+        period_items = period_orders
+
+        for order in period_items:
             customer = order.customer
             if customer:
                 record = customer_summary.setdefault(
@@ -1520,12 +1535,6 @@ async def dashboard(
                         "last_order_time": None,
                     },
                 )
-                record["order_count"] += 1
-                record["total_spent"] += order.total_amount
-                if order.order_time and (
-                    record["last_order_time"] is None or order.order_time > record["last_order_time"]
-                ):
-                    record["last_order_time"] = order.order_time
                 record["order_count"] += 1
                 record["total_spent"] += order.total_amount
                 if order.order_time and (
@@ -1639,13 +1648,43 @@ async def dashboard(
 
         new_customers = sum(1 for first_order_time in customer_first_order.values() if first_order_time >= period_start)
 
+        # Model-based prep forecasting:
+        # - build per-item daily sales history for lookback window
+        # - apply linear trend to next day and scale to selected period length
+        lookback_days = 28
+        report_end = now.date()
+        report_start = report_end - timedelta(days=lookback_days - 1)
+
+        item_daily_history = defaultdict(lambda: [0] * lookback_days)
+        for order in orders:
+            if not order.order_time:
+                continue
+            order_date = order.order_time.date()
+            if order_date < report_start or order_date > report_end:
+                continue
+            day_index = (order_date - report_start).days
+            for order_item in order.items:
+                name = order_item.menu_item.name if order_item.menu_item else f"Item #{order_item.menu_item_id}"
+                item_daily_history[name][day_index] += order_item.quantity
+
         demand_forecast = []
         for item in top_menu_items[:3]:
-            suggested_qty = max(6, round(item["quantity_sold"] * 1.2))
+            item_name = item["name"]
+            period_qty = item["quantity_sold"]
+            histogram = item_daily_history.get(item_name, [0] * lookback_days)
+
+            # EMA model forecast
+            model_daily = exponential_smoothing_forecast(histogram, alpha=0.3, lookahead_days=1)
+            model_period = model_daily * period_days
+
+            # Use model projection directly for prep quantity
+            suggested_qty = max(6, round(model_period))
+
             demand_forecast.append(
                 {
-                    "name": item["name"],
-                    "period_units": item["quantity_sold"],
+                    "name": item_name,
+                    "period_units": period_qty,
+                    "model_forecast": round(model_period, 1),
                     "suggested_qty": suggested_qty,
                 }
             )
@@ -1930,7 +1969,8 @@ async def dashboard(
             {
                 "name": item["name"],
                 "period_units": scaled_count(item["period_units"], minimum=1),
-                "suggested_qty": scaled_count(item["suggested_qty"], minimum=1),
+                "model_forecast": round(item.get("model_forecast", 0.0), 1),
+                "suggested_qty": scaled_count(int(round(item.get("model_forecast", 0.0))), minimum=1),
             }
             for item in demand_forecast
         ]
