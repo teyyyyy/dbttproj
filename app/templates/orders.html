@@ -1,208 +1,282 @@
 {% extends "base.html" %}
 
-{% block title %}{% if current_user.role == 'vendor' %}Vendor Orders{% else %}Your Orders{% endif %}{% endblock %}
+{% block title %}{% if current_user.role == 'vendor' %}Vendor Orders{% else %}My Orders{% endif %}{% endblock %}
 
 {% block content %}
-<h1>{% if current_user.role == 'vendor' %}Vendor Orders{% else %}Your Orders{% endif %}</h1>
+{% set role = current_user.role %}
+<section class="orders-page">
+    <div class="card orders-hero mb-4">
+        <div class="card-body orders-hero__body">
+            <div>
+                <p class="eyebrow mb-2">Orders</p>
+                <h1 class="mb-2">{% if role == 'vendor' %}Vendor Orders{% else %}My Orders{% endif %}</h1>
+                <p class="text-muted mb-0">
+                    {% if role == 'vendor' %}
+                    Track incoming cafe orders through the full prep flow from preparing to collected.
+                    {% else %}
+                    Follow each paid order through the same lifecycle the vendor sees.
+                    {% endif %}
+                </p>
+            </div>
+            <div class="orders-hero__summary">
+                <span class="orders-hero__summary-label">Current view</span>
+                <strong>
+                    {% if selected_status %}
+                        {{ order_status_labels[selected_status] }}
+                    {% else %}
+                        All orders
+                    {% endif %}
+                </strong>
+            </div>
+        </div>
+    </div>
 
-{% if current_user.role == 'vendor' %}
-<p class="text-muted">Monitor incoming orders for {{ managed_cafe.name if managed_cafe else 'your cafe' }} and review each basket in one place.</p>
-
-<div class="card mb-4">
-    <div class="card-body">
-        <div class="status-filter-bar">
-            <a href="/orders?sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip {% if not order_filters.status %}status-filter-chip--active{% endif %}">All</a>
-            <a href="/orders?status=new&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--new {% if order_filters.status == 'new' %}status-filter-chip--active{% endif %}">New</a>
-            <a href="/orders?status=preparing&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--preparing {% if order_filters.status == 'preparing' %}status-filter-chip--active{% endif %}">Preparing</a>
-            <a href="/orders?status=ready&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--ready {% if order_filters.status == 'ready' %}status-filter-chip--active{% endif %}">Ready</a>
-            <a href="/orders?status=closed&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--closed {% if order_filters.status == 'closed' %}status-filter-chip--active{% endif %}">Closed</a>
-        </div>
-        <form method="get" action="/orders" class="row g-3 align-items-end">
-            <div class="col-md-2">
-                <label for="date_from" class="form-label">From</label>
-                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ order_filters.date_from }}">
-            </div>
-            <div class="col-md-2">
-                <label for="date_to" class="form-label">To</label>
-                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ order_filters.date_to }}">
-            </div>
-            <div class="col-md-2">
-                <label for="status" class="form-label">Status</label>
-                <select class="form-select" id="status" name="status">
-                    <option value="">All</option>
-                    <option value="new" {% if order_filters.status == 'new' %}selected{% endif %}>New</option>
-                    <option value="preparing" {% if order_filters.status == 'preparing' %}selected{% endif %}>Preparing</option>
-                    <option value="ready" {% if order_filters.status == 'ready' %}selected{% endif %}>Ready</option>
-                    <option value="closed" {% if order_filters.status == 'closed' %}selected{% endif %}>Closed</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label for="item_search" class="form-label">Item</label>
-                <input type="text" class="form-control" id="item_search" name="item_search" placeholder="e.g. Matcha" value="{{ order_filters.item_search }}">
-            </div>
-            <div class="col-md-2">
-                <label for="customer_search" class="form-label">Customer</label>
-                <input type="text" class="form-control" id="customer_search" name="customer_search" placeholder="Name or email" value="{{ order_filters.customer_search }}">
-            </div>
-            <div class="col-md-2">
-                <label for="sort" class="form-label">Sort</label>
-                <select class="form-select" id="sort" name="sort">
-                    <option value="newest" {% if order_filters.sort == 'newest' %}selected{% endif %}>Newest</option>
-                    <option value="oldest" {% if order_filters.sort == 'oldest' %}selected{% endif %}>Oldest</option>
-                    <option value="highest" {% if order_filters.sort == 'highest' %}selected{% endif %}>Highest value</option>
-                </select>
-            </div>
-            <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Apply Filters</button>
-                <a href="/orders" class="btn btn-outline-secondary">Clear</a>
-            </div>
-        </form>
-    </div>
-</div>
-
-{% if order_analytics.total_orders %}
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body">
-                <p class="text-muted mb-1">Total orders</p>
-                <h3 class="mb-0">{{ order_analytics.total_orders }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body">
-                <p class="text-muted mb-1">Revenue</p>
-                <h3 class="mb-0">${{ "%.2f"|format(order_analytics.total_revenue) }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body">
-                <p class="text-muted mb-1">Average order</p>
-                <h3 class="mb-0">${{ "%.2f"|format(order_analytics.average_order_value) }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body">
-                <p class="text-muted mb-1">Completion rate</p>
-                <h3 class="mb-0">{{ order_analytics.completion_rate }}%</h3>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header">
-                <h5 class="mb-0">Order status breakdown</h5>
-            </div>
-            <div class="card-body">
-                <p class="mb-1"><strong>New:</strong> {{ status_display_counts.new }}</p>
-                <p class="mb-1"><strong>Preparing:</strong> {{ status_display_counts.preparing }}</p>
-                <p class="mb-1"><strong>Ready:</strong> {{ status_display_counts.ready }}</p>
-                <p><strong>Closed:</strong> {{ status_display_counts.closed }}</p>
-                {% if managed_cafe %}
-                <p class="mb-0"><strong>Managed cafe:</strong> {{ managed_cafe.name }}</p>
-                {% elif order_analytics.top_cafe %}
-                <p class="mb-0"><strong>Top cafe:</strong> {{ order_analytics.top_cafe.name }} ({{ order_analytics.top_cafe.orders }} orders)</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header">
-                <h5 class="mb-0">Recent order notes</h5>
-            </div>
-            <div class="card-body">
-                {% if recent_order_notes %}
-                    {% for note in recent_order_notes %}
-                    <div class="mb-3">
-                        <p class="mb-1"><strong>{{ note.customer }}</strong></p>
-                        <p class="mb-1">{{ note.note }}</p>
-                        <p class="text-muted mb-0">{{ note.time }}</p>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted mb-0">No order notes have been added yet.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-{% endif %}
-
-{% macro order_card(order) -%}
-<div class="col-md-6">
-    <div class="card h-100 order-card order-card--{{ order.status }}">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Order #{{ order.id }}</h5>
-            {% set status_labels = {
-                'pending': 'Pending',
-                'confirmed': 'New',
-                'preparing': 'Preparing',
-                'ready': 'Closed',
-                'delivered': 'Delivered'
-            } %}
-            <span class="badge order-status-badge order-status-badge--{{ order.status }} text-uppercase">{{ status_labels.get(order.status, order.status) }}</span>
-        </div>
+    <div class="card mb-4">
         <div class="card-body">
-            {% if current_user.role == 'vendor' %}
-            <p><strong>Customer:</strong> {{ order.customer.full_name }} ({{ order.customer.email }})</p>
-            {% endif %}
-            {% if order.status == 'pending' %}
-            <p class="order-alert">Pending orders still need confirmation before prep can begin.</p>
-            {% endif %}
-            <p><strong>Total:</strong> ${{ "%.2f"|format(order.total_amount) }}</p>
-            <p><strong>Time:</strong> {{ order.order_time }}</p>
-            <p><strong>Address:</strong> {{ order.delivery_address }}</p>
-            <h6>Items:</h6>
-            <ul>
-                {% for item in order.items %}
-                <li>{{ item.quantity }} x {{ item.menu_item.name }} @ ${{ "%.2f"|format(item.price) }}</li>
+            <div class="status-filter-bar">
+                <a href="/orders?sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip {% if not selected_status %}status-filter-chip--active{% endif %}">All</a>
+                {% for status_key in order_status_flow %}
+                <a href="/orders?status={{ status_key }}&sort={{ order_filters.sort }}{% if order_filters.date_from %}&date_from={{ order_filters.date_from }}{% endif %}{% if order_filters.date_to %}&date_to={{ order_filters.date_to }}{% endif %}{% if order_filters.item_search %}&item_search={{ order_filters.item_search|urlencode }}{% endif %}{% if order_filters.customer_search %}&customer_search={{ order_filters.customer_search|urlencode }}{% endif %}" class="status-filter-chip status-filter-chip--{{ status_key }} {% if selected_status == status_key %}status-filter-chip--active{% endif %}">{{ order_status_labels[status_key] }}</a>
                 {% endfor %}
-            </ul>
-            {% if current_user.role == 'customer' and order.status in ['ready', 'delivered'] %}
-            <button class="btn btn-outline-warning text-dark btn-sm mt-3 border bg-light shadow-sm review-prompt-btn" data-order-id="{{ order.id }}" data-cafe-name="{{ order.cafe.name }}">⭐ Leave a Review</button>
-            {% endif %}
+            </div>
+
+            <form method="get" action="/orders" class="row g-3 align-items-end mt-2">
+                <input type="hidden" name="status" value="{{ selected_status }}">
+                <div class="col-md-3">
+                    <label for="sort" class="form-label">Sort</label>
+                    <select class="form-select" id="sort" name="sort">
+                        <option value="newest" {% if order_filters.sort == 'newest' %}selected{% endif %}>Newest</option>
+                        <option value="oldest" {% if order_filters.sort == 'oldest' %}selected{% endif %}>Oldest</option>
+                        <option value="highest" {% if order_filters.sort == 'highest' %}selected{% endif %}>Highest value</option>
+                    </select>
+                </div>
+
+                {% if role == 'vendor' %}
+                <div class="col-md-3">
+                    <label for="date_from" class="form-label">From</label>
+                    <input type="date" class="form-control" id="date_from" name="date_from" value="{{ order_filters.date_from }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="date_to" class="form-label">To</label>
+                    <input type="date" class="form-control" id="date_to" name="date_to" value="{{ order_filters.date_to }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="item_search" class="form-label">Item</label>
+                    <input type="text" class="form-control" id="item_search" name="item_search" placeholder="e.g. Matcha" value="{{ order_filters.item_search }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="customer_search" class="form-label">Customer</label>
+                    <input type="text" class="form-control" id="customer_search" name="customer_search" placeholder="Name or email" value="{{ order_filters.customer_search }}">
+                </div>
+                {% endif %}
+
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    <a href="/orders" class="btn btn-outline-secondary">Clear</a>
+                </div>
+            </form>
         </div>
     </div>
-</div>
-{%- endmacro %}
 
-<section class="mb-4">
-    <div class="card">
+    {% if role == 'vendor' and order_analytics.total_orders %}
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Total orders</p>
+                    <h3 class="mb-0">{{ order_analytics.total_orders }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Revenue</p>
+                    <h3 class="mb-0">${{ "%.2f"|format(order_analytics.total_revenue) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Average order</p>
+                    <h3 class="mb-0">${{ "%.2f"|format(order_analytics.average_order_value) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Completion rate</p>
+                    <h3 class="mb-0">{{ order_analytics.completion_rate }}%</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Order status breakdown</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1"><strong>Preparing:</strong> {{ status_display_counts.get('preparing', 0) }}</p>
+                    <p class="mb-1"><strong>Ready:</strong> {{ status_display_counts.get('ready', 0) }}</p>
+                    <p class="mb-1"><strong>Closed:</strong> {{ status_display_counts.get('closed', 0) }}</p>
+                    {% if managed_cafe %}
+                    <p class="mb-0"><strong>Managed cafe:</strong> {{ managed_cafe.name }}</p>
+                    {% elif order_analytics.top_cafe %}
+                    <p class="mb-0"><strong>Top cafe:</strong> {{ order_analytics.top_cafe.name }} ({{ order_analytics.top_cafe.orders }} orders)</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent order notes</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_order_notes %}
+                        {% for note in recent_order_notes %}
+                        <div class="mb-3">
+                            <p class="mb-1"><strong>{{ note.customer }}</strong></p>
+                            <p class="mb-1">{{ note.note }}</p>
+                            <p class="text-muted mb-0">{{ note.time }}</p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted mb-0">No order notes have been added yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if role == 'customer' %}
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Orders in view</p>
+                    <h3 class="mb-0">{{ order_analytics.total_orders }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Completed</p>
+                    <h3 class="mb-0">{{ status_display_counts.get('closed', 0) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Points balance</p>
+                    <h3 class="mb-0">{{ points_balance }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <section class="card">
         <div class="card-body">
-            <h3 class="mb-3">{% if current_user.role == 'vendor' %}All Orders{% else %}Your Orders{% endif %}</h3>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h3 class="mb-0">{% if role == 'vendor' %}All Orders{% else %}Order Timeline{% endif %}</h3>
+                {% if role == 'customer' %}
+                <p class="text-muted mb-0">Your orders now follow the same lifecycle as the vendor dashboard.</p>
+                {% endif %}
+            </div>
+
             {% if orders %}
             <div class="row g-4">
                 {% for order in orders %}
-                {{ order_card(order) }}
+                <div class="{% if role == 'vendor' %}col-12{% else %}col-12{% endif %}">
+                    <article class="card order-card order-card--{{ order.display_status }}">
+                        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div>
+                                <h5 class="mb-0">Order #{{ order.id }}</h5>
+                                <small class="text-muted">
+                                    {{ order.order_time.strftime('%d %b %Y, %I:%M %p') if order.order_time else 'N/A' }}
+                                </small>
+                            </div>
+                            <span class="badge order-status-badge order-status-badge--{{ order.display_status }} text-uppercase">
+                                {{ order_status_labels[order.display_status] }}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            {% if role == 'vendor' %}
+                            <p class="mb-2"><strong>Customer:</strong> {{ order.customer.full_name }} ({{ order.customer.email }})</p>
+                            {% else %}
+                            <p class="mb-2"><strong>Cafe:</strong> {{ order.cafe.name if order.cafe else 'Cafe' }}</p>
+                            {% endif %}
+
+                            <div class="order-timeline mb-3">
+                                {% for step in order_timeline_steps %}
+                                <div class="order-timeline__item {% if loop.index0 < order.status_position %}is-complete{% elif loop.index0 == order.status_position %}is-active{% endif %}">
+                                    <div class="order-timeline__rail">
+                                        <span class="order-timeline__dot"></span>
+                                        {% if not loop.last %}
+                                        <span class="order-timeline__line"></span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="order-timeline__content">
+                                        <div class="d-flex justify-content-between align-items-start gap-2">
+                                            <div>
+                                                <p class="mb-1 fw-bold">{{ step.label }}</p>
+                                                <p class="text-muted mb-0">{{ step.description }}</p>
+                                            </div>
+                                            {% if loop.index0 == order.status_position %}
+                                            <span class="order-timeline__current">Current</span>
+                                            {% elif loop.index0 < order.status_position %}
+                                            <span class="order-timeline__current order-timeline__current--done">Done</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="order-meta-grid">
+                                <p class="mb-1"><strong>Total:</strong> ${{ "%.2f"|format(order.total_amount) }}</p>
+                                <p class="mb-1"><strong>Pickup address:</strong> {{ order.delivery_address }}</p>
+                                <p class="mb-1"><strong>Items:</strong></p>
+                                <ul class="mb-0">
+                                    {% for item in order.items %}
+                                    <li>{{ item.quantity }} x {{ item.menu_item.name }} @ ${{ "%.2f"|format(item.price) }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+
+                            {% if role == 'customer' and order.display_status == 'closed' %}
+                            <button class="btn btn-outline-warning text-dark btn-sm mt-3 border bg-light shadow-sm review-prompt-btn" data-order-id="{{ order.id }}" data-cafe-name="{{ order.cafe.name if order.cafe else 'your cafe' }}">⭐ Leave a Review</button>
+                            {% endif %}
+                        </div>
+                    </article>
+                </div>
                 {% endfor %}
             </div>
             {% else %}
-            <p>{% if current_user.role == 'vendor' %}No customer orders have been placed for your cafe yet.{% else %}You have no orders yet.{% endif %}</p>
+            <p class="mb-0">{% if role == 'vendor' %}No customer orders have been placed for your cafe yet.{% else %}You have no orders yet.{% endif %}</p>
             {% endif %}
         </div>
+    </section>
+
+    <div class="mt-3">
+        {% if role == 'vendor' %}
+        <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
+        {% else %}
+        <a href="/cafes" class="btn btn-primary">Order More</a>
+        {% endif %}
     </div>
 </section>
 
-<div class="mt-3">
-    {% if current_user.role == 'vendor' %}
-    <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
-    {% else %}
-    <a href="/cafes" class="btn btn-primary">Order More</a>
-    {% endif %}
-</div>
-
-<!-- Review Modal Draft -->
+{% if role == 'customer' %}
 <div class="modal fade" id="reviewModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -233,7 +307,12 @@
     </div>
   </div>
 </div>
+{% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+{% if role == 'customer' %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.review-prompt-btn').forEach(btn => {
@@ -264,4 +343,5 @@ function submitReview() {
     }).catch(err => alert("Failed to submit review."));
 }
 </script>
+{% endif %}
 {% endblock %}

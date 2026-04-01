@@ -656,12 +656,97 @@ def cleanup_legacy_demo_user_names(db: Session):
     db.commit()
 
 
+ORDER_STATUS_FLOW = ["preparing", "ready", "closed"]
+ORDER_STATUS_ALIASES = {
+    "pending": "preparing",
+    "confirmed": "preparing",
+    "delivered": "closed",
+}
+
+
+def normalize_order_status(status: Optional[str]) -> str:
+    raw_status = (status or "").strip().lower()
+    if not raw_status:
+        return "preparing"
+    normalized = ORDER_STATUS_ALIASES.get(raw_status, raw_status)
+    return normalized if normalized in ORDER_STATUS_FLOW else "preparing"
+
+
+def get_order_status_filter_values(status: str) -> set[str]:
+    normalized = normalize_order_status(status)
+    return {
+        source_status
+        for source_status, target_status in {
+            "pending": "preparing",
+            "confirmed": "preparing",
+            "preparing": "preparing",
+            "ready": "ready",
+            "closed": "closed",
+            "delivered": "closed",
+        }.items()
+        if target_status == normalized
+    }
+
+
+def get_order_status_context(role: str):
+    if role == "vendor":
+        return {
+            "status_labels": {
+                "preparing": "Preparing",
+                "ready": "Ready",
+                "closed": "Closed",
+            },
+            "timeline_steps": [
+                {
+                    "key": "preparing",
+                    "label": "Preparing",
+                    "description": "The kitchen is working on this order.",
+                },
+                {
+                    "key": "ready",
+                    "label": "Ready",
+                    "description": "The order is ready for collection.",
+                },
+                {
+                    "key": "closed",
+                    "label": "Closed",
+                    "description": "The order has been collected and closed.",
+                },
+            ],
+        }
+
+    return {
+        "status_labels": {
+            "preparing": "Order being prepared",
+            "ready": "Ready for collection",
+            "closed": "Completed",
+        },
+        "timeline_steps": [
+            {
+                "key": "preparing",
+                "label": "Order being prepared",
+                "description": "We've received your payment and the kitchen is working on it.",
+            },
+            {
+                "key": "ready",
+                "label": "Ready for collection",
+                "description": "Your order is ready to pick up.",
+            },
+            {
+                "key": "closed",
+                "label": "Completed",
+                "description": "Your order has been collected and completed.",
+            },
+        ],
+    }
+
+
 def build_order_analytics(orders: list[Order]):
     total_orders = len(orders)
     total_revenue = sum(order.total_amount for order in orders)
     average_order_value = total_revenue / total_orders if total_orders else 0.0
-    status_counts = Counter(order.status for order in orders)
-    completed_orders = sum(1 for order in orders if order.status in {"ready", "delivered"})
+    status_counts = Counter(normalize_order_status(order.status) for order in orders)
+    completed_orders = sum(1 for order in orders if normalize_order_status(order.status) == "closed")
 
     cafe_counts = Counter(order.cafe.name for order in orders if order.cafe)
     top_cafe = cafe_counts.most_common(1)[0] if cafe_counts else None
@@ -1086,7 +1171,7 @@ async def login_post(request: Request, username: str = Form(...), password: str 
         db.add(point)
         db.commit()
     access_token = create_access_token(data={"sub": user.email})
-    response = RedirectResponse(url="/dashboard", status_code=302)
+    response = RedirectResponse(url="/dashboard" if user.role == "vendor" else "/orders", status_code=302)
     response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
     response.set_cookie(key="role", value=user.role, max_age=3600)
     return response
@@ -1163,7 +1248,7 @@ async def dashboard(
             for o in period_orders
             if not (
                 selected_period in {"weekly", "monthly"}
-                and o.status == "pending"
+                and normalize_order_status(o.status) == "preparing"
                 and o.order_time
                 and o.order_time.date() < today
             )
@@ -1175,7 +1260,7 @@ async def dashboard(
             else (total_revenue / total_orders if total_orders else 0)
         )
 
-        status_counts = Counter(order.status for order in operational_period_orders)
+        status_counts = Counter(normalize_order_status(order.status) for order in operational_period_orders)
         low_stock_items = [item for item in menu_items if item.is_available is False][:5]
 
         item_performance = defaultdict(
@@ -1524,7 +1609,7 @@ async def dashboard(
         booking_completion_rate = (
             round(
                 (
-                    len([order for order in operational_period_orders if order.status in {"ready", "delivered"}])
+                    len([order for order in operational_period_orders if normalize_order_status(order.status) in {"ready", "closed"}])
                     / platform_bookings
                 )
                 * 100
@@ -1741,18 +1826,7 @@ async def dashboard(
             },
         )
     elif current_user.role == "customer":
-        orders = db.query(Order).filter(Order.customer_id == current_user.id).limit(5).all()
-        points_balance = db.query(Point).filter(Point.user_id == current_user.id).count()  # Simplified
-        chart_preferences = {}
-        item_bubble_data = []
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request, 
-            "current_user": current_user, 
-            "orders": orders, 
-            "points_balance": points_balance,
-            "chart_preferences": chart_preferences,
-            "item_bubble_data": item_bubble_data,
-        })
+        return RedirectResponse(url="/orders", status_code=302)
 
 from sqlalchemy import text 
 @app.get("/db-dump-full")
@@ -1877,17 +1951,15 @@ async def user_orders(
         joinedload(Order.cafe),
     )
 
+    requested_status = normalize_order_status(status) if status else ""
+    status_filter_values = get_order_status_filter_values(status) if status else set()
+
     if current_user.role == "vendor":
         cafe_ids = [cafe.id for cafe in db.query(Cafe).filter(Cafe.vendor_id == current_user.id).all()]
         query = query.filter(Order.cafe_id.in_(cafe_ids)) if cafe_ids else query.filter(False)
 
-        if status:
-            if status == "new":
-                query = query.filter(Order.status == "confirmed")
-            elif status == "closed":
-                query = query.filter(Order.status == "ready")
-            else:
-                query = query.filter(Order.status == status)
+        if requested_status:
+            query = query.filter(Order.status.in_(status_filter_values))
         if date_from:
             try:
                 query = query.filter(func.date(Order.order_time) >= datetime.strptime(date_from, "%Y-%m-%d").date())
@@ -1916,6 +1988,12 @@ async def user_orders(
         orders = query.distinct().all()
     else:
         orders = query.filter(Order.customer_id == current_user.id).order_by(Order.order_time.desc()).all()
+        if requested_status:
+            orders = [order for order in orders if normalize_order_status(order.status) == requested_status]
+
+    for order in orders:
+        order.display_status = normalize_order_status(order.status)
+        order.status_position = ORDER_STATUS_FLOW.index(order.display_status)
 
     points_balance = db.query(func.sum(Point.amount)).filter(Point.user_id == current_user.id).scalar() or 0
     order_analytics = build_order_analytics(orders)
@@ -1923,12 +2001,8 @@ async def user_orders(
     managed_cafe = None
     if current_user.role == "vendor":
         managed_cafe = get_managed_cafe_for_vendor(db, current_user.id)
-    status_display_counts = {
-        "new": 16,
-        "preparing": 5,
-        "ready": 10,
-        "closed": 20,
-    }
+    status_context = get_order_status_context(current_user.role)
+    status_display_counts = Counter(order.display_status for order in orders)
     return templates.TemplateResponse(
         "orders.html",
         {
@@ -1939,6 +2013,9 @@ async def user_orders(
             "order_analytics": order_analytics,
             "managed_cafe": managed_cafe,
             "status_display_counts": status_display_counts,
+            "order_status_flow": ORDER_STATUS_FLOW,
+            "order_status_labels": status_context["status_labels"],
+            "order_timeline_steps": status_context["timeline_steps"],
             "order_filters": {
                 "status": status,
                 "date_from": date_from,
@@ -1947,6 +2024,7 @@ async def user_orders(
                 "customer_search": customer_search,
                 "sort": sort,
             },
+            "selected_status": requested_status,
         },
     )
 
@@ -1984,7 +2062,7 @@ async def checkout(request: Request, current_user: User = Depends(get_current_us
         cafe_id=cafe_id, 
         total_amount=final_total, 
         delivery_address=delivery_address,
-        status="delivered"
+        status="preparing"
     )
     db.add(order)
     db.flush()

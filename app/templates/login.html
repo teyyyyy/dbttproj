@@ -40,7 +40,7 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     if (username === "customer@gmail.com" || username === "vendor@gmail.com") {
         const role = username === "customer@gmail.com" ? "customer" : "vendor";
         document.cookie = `role=${role}; path=/; max-age=3600`;  // 1 hour
-        const redirectUrl = role === "vendor" ? "/dashboard" : "/";
+        const redirectUrl = role === "vendor" ? "/dashboard" : "/orders";
         window.location.href = redirectUrl;
     } else {
         alert('Invalid credentials');

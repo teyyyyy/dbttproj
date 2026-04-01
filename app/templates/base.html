@@ -44,9 +44,11 @@
                     <li class="nav-item"><a
                             class="nav-link text-warning {% if request.url.path == '/account' %}fw-bold text-decoration-underline{% else %}fw-semibold{% endif %}"
                             href="/account">My Account</a></li>
+                    {% if current_user.role == 'vendor' %}
                     <li class="nav-item"><a
                             class="nav-link {% if request.url.path.startswith('/dashboard') %}active fw-bold{% endif %}"
                             href="/dashboard">Dashboard</a></li>
+                    {% endif %}
                     <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
                     {% else %}
                     <li class="nav-item"><a

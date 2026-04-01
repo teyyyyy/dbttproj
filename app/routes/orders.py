@@ -26,7 +26,8 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db), current_user
         cafe_id=order.cafe_id,
         total_amount=total,
         delivery_address=order.delivery_address,
-        notes=order.notes
+        notes=order.notes,
+        status="preparing"
     )
     db.add(db_order)
     db.commit()

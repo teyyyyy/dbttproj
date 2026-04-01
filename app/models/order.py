@@ -10,7 +10,7 @@ class Order(Base):
     customer_id = Column(Integer, ForeignKey("users.id"))
     cafe_id = Column(Integer, ForeignKey("cafes.id"))
     total_amount = Column(Float)
-    status = Column(String, default="pending")  # pending, confirmed, preparing, ready, delivered
+    status = Column(String, default="preparing")  # preparing, ready, closed
     order_time = Column(DateTime(timezone=True), server_default=func.now())
     delivery_address = Column(Text)
     notes = Column(Text, nullable=True)
