@@ -1880,42 +1880,51 @@ async def user_orders(
     if current_user.role == "vendor":
         cafe_ids = [cafe.id for cafe in db.query(Cafe).filter(Cafe.vendor_id == current_user.id).all()]
         query = query.filter(Order.cafe_id.in_(cafe_ids)) if cafe_ids else query.filter(False)
+    else:
+        query = query.filter(Order.customer_id == current_user.id)
 
-        if status:
-            if status == "new":
-                query = query.filter(Order.status == "confirmed")
-            elif status == "closed":
+    if status:
+        if current_user.role == "customer":
+            if status == "preparing":
+                query = query.filter(Order.status.in_(["pending", "confirmed", "new", "preparing"]))
+            elif status == "ready":
                 query = query.filter(Order.status == "ready")
+            elif status == "closed":
+                query = query.filter(Order.status.in_(["delivered", "closed"]))
+        else:
+            if status == "new":
+                query = query.filter(Order.status.in_(["confirmed", "new"]))
+            elif status == "closed":
+                query = query.filter(Order.status.in_(["delivered", "closed"]))
             else:
                 query = query.filter(Order.status == status)
-        if date_from:
-            try:
-                query = query.filter(func.date(Order.order_time) >= datetime.strptime(date_from, "%Y-%m-%d").date())
-            except ValueError:
-                pass
-        if date_to:
-            try:
-                query = query.filter(func.date(Order.order_time) <= datetime.strptime(date_to, "%Y-%m-%d").date())
-            except ValueError:
-                pass
-        if item_search:
-            query = query.join(Order.items).join(OrderItem.menu_item).filter(MenuItem.name.ilike(f"%{item_search.strip()}%"))
-        if customer_search:
-            query = query.join(Order.customer).filter(
-                (User.full_name.ilike(f"%{customer_search.strip()}%")) |
-                (User.email.ilike(f"%{customer_search.strip()}%"))
-            )
 
-        if sort == "oldest":
-            query = query.order_by(Order.order_time.asc())
-        elif sort == "highest":
-            query = query.order_by(Order.total_amount.desc(), Order.order_time.desc())
-        else:
-            query = query.order_by(Order.order_time.desc())
+    if date_from:
+        try:
+            query = query.filter(func.date(Order.order_time) >= datetime.strptime(date_from, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            query = query.filter(func.date(Order.order_time) <= datetime.strptime(date_to, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+    if item_search:
+        query = query.join(Order.items).join(OrderItem.menu_item).filter(MenuItem.name.ilike(f"%{item_search.strip()}%"))
+    if customer_search:
+        query = query.join(Order.customer).filter(
+            (User.full_name.ilike(f"%{customer_search.strip()}%")) |
+            (User.email.ilike(f"%{customer_search.strip()}%"))
+        )
 
-        orders = query.distinct().all()
+    if sort == "oldest":
+        query = query.order_by(Order.order_time.asc())
+    elif sort == "highest":
+        query = query.order_by(Order.total_amount.desc(), Order.order_time.desc())
     else:
-        orders = query.filter(Order.customer_id == current_user.id).order_by(Order.order_time.desc()).all()
+        query = query.order_by(Order.order_time.desc())
+
+    orders = query.distinct().all()
 
     points_balance = db.query(func.sum(Point.amount)).filter(Point.user_id == current_user.id).scalar() or 0
     order_analytics = build_order_analytics(orders)
@@ -1984,7 +1993,7 @@ async def checkout(request: Request, current_user: User = Depends(get_current_us
         cafe_id=cafe_id, 
         total_amount=final_total, 
         delivery_address=delivery_address,
-        status="delivered"
+        status="confirmed"
     )
     db.add(order)
     db.flush()

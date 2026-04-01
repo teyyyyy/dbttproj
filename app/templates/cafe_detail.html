@@ -29,7 +29,11 @@
         <div class="mb-3">
             <h5>Location Map</h5>
             {% if cafe.latitude and cafe.longitude %}
-            <div id="cafe-map" style="height: 300px; border-radius: 8px; z-index: 1;"></div>
+            <div id="cafe-map" style="height: 300px; border-radius: 8px; z-index: 1;"
+                data-lat="{{ cafe.latitude }}"
+                data-lng="{{ cafe.longitude }}"
+                data-name="{{ cafe.name }}"
+                data-address="{{ cafe.address }}"></div>
             {% else %}
             <div class="alert alert-secondary text-center">Location data not available for this cafe.</div>
             {% endif %}
@@ -60,7 +64,8 @@
                             <p class="card-text">{{ item.description }}</p>
                             <p class="card-text"><strong>${{ "%.2f"|format(item.price) }}</strong></p>
                             {% if current_user and current_user.role == 'customer' and item.is_available %}
-                            <button class="btn btn-success add-to-cart" data-item-id="{{ item.id }}">Add to
+                            <button class="btn btn-success add-to-cart" data-item-id="{{ item.id }}"
+                                data-item-name="{{ item.name }}" data-item-price="{{ item.price }}">Add to
                                 Cart</button>
                             {% endif %}
                         </div>
@@ -119,8 +124,8 @@
     document.querySelectorAll('.add-to-cart').forEach(button => {
         button.addEventListener('click', function () {
             const itemId = this.dataset.itemId;
-            const itemName = this.previousElementSibling.previousElementSibling.textContent;
-            const itemPrice = parseFloat(this.previousElementSibling.textContent.replace('$', ''));
+            const itemName = this.dataset.itemName;
+            const itemPrice = parseFloat(this.dataset.itemPrice);
 
             cart.push({ id: itemId, name: itemName, price: itemPrice, quantity: 1 });
             updateCart();
@@ -160,13 +165,17 @@
 
 {% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script>
     {% if cafe.latitude and cafe.longitude %}
+<script>
+    /* global L */
     document.addEventListener('DOMContentLoaded', function() {
-        var lat = {{ cafe.latitude }};
-        var lng = {{ cafe.longitude }};
-        var cafeName = {{ cafe.name | tojson | safe }};
-        var cafeAddress = {{ cafe.address | tojson | safe }};
+        var mapContainer = document.getElementById('cafe-map');
+        if (!mapContainer) return;
+
+        var lat = parseFloat(mapContainer.dataset.lat);
+        var lng = parseFloat(mapContainer.dataset.lng);
+        var cafeName = mapContainer.dataset.name;
+        var cafeAddress = mapContainer.dataset.address;
         
         var map = L.map('cafe-map').setView([lat, lng], 15);
 
@@ -179,6 +188,6 @@
             .bindPopup("<b>" + cafeName + "</b><br>" + cafeAddress)
             .openPopup();
     });
-    {% endif %}
 </script>
+    {% endif %}
 {% endblock %}

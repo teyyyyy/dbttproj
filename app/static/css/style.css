@@ -1727,3 +1727,87 @@ footer {
         text-align: left;
     }
 }
+
+/* Customer Order Timeline */
+.customer-timeline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 1rem 0 1.5rem;
+    position: relative;
+    padding: 0 0.5rem;
+}
+
+.timeline-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 2;
+    color: rgba(17, 34, 24, 0.4);
+    transition: all 0.3s ease;
+    width: 33%;
+    text-align: center;
+}
+
+.timeline-step.active {
+    color: var(--brand-green);
+}
+
+.timeline-step.active .step-icon {
+    background-color: var(--brand-green);
+    color: #fff;
+    border-color: var(--brand-green);
+    box-shadow: 0 4px 12px rgba(36, 92, 67, 0.25);
+    transform: scale(1.1);
+}
+
+.step-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background-color: #fff;
+    border: 2px solid rgba(17, 34, 24, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.step-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.timeline-connector {
+    flex-grow: 1;
+    height: 3px;
+    background-color: rgba(17, 34, 24, 0.1);
+    position: absolute;
+    top: 1rem;
+    left: 16.5%;
+    right: 16.5%;
+    z-index: 1;
+}
+
+.timeline-connector.segment-1 {
+    right: 50%;
+}
+.timeline-connector.segment-2 {
+    left: 50%;
+}
+
+.timeline-connector-fill {
+    height: 100%;
+    width: 0%;
+    background-color: var(--brand-green);
+    transition: width 0.5s ease;
+}
+
+.timeline-connector.active .timeline-connector-fill {
+    width: 100%;
+}
