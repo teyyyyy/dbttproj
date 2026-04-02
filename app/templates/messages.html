@@ -96,7 +96,12 @@
             const targetId = this.dataset.targetId;
             const cafeId = this.dataset.cafeId;
             
-            document.getElementById('chat-title').textContent = name;
+            if (userRole === "customer") {
+                document.getElementById('chat-title').innerHTML = `<a href="/cafes/${cafeId}" class="text-reset text-decoration-none text-primary-hover border-bottom border-primary border-opacity-0 hover-border-opacity-100 transition-all font-weight-bold" style="cursor: pointer;">${name}</a>`;
+            } else {
+                document.getElementById('chat-title').textContent = name;
+            }
+            
             document.getElementById('chat-form').classList.remove('d-none');
             
             activeCafeId = cafeId;
@@ -185,7 +190,11 @@
             document.getElementById('thread-list').prepend(tempBtn);
             
             // Re-apply click handler for this temp button specifically, or manually invoke logic
-            document.getElementById('chat-title').textContent = cafeName;
+            if (userRole === "customer") {
+                document.getElementById('chat-title').innerHTML = `<a href="/cafes/${initialCafeId}" class="text-reset text-decoration-none text-primary-hover border-bottom border-primary border-opacity-0 hover-border-opacity-100 transition-all font-weight-bold" style="cursor: pointer;">${cafeName}</a>`;
+            } else {
+                document.getElementById('chat-title').textContent = cafeName;
+            }
             document.getElementById('chat-form').classList.remove('d-none');
             activeCafeId = initialCafeId;
             loadMessages();
