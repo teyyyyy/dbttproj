@@ -9,19 +9,24 @@
             <div class="list-group list-group-flush" id="thread-list">
                 {% if threads %}
                     {% for thread in threads %}
-                    <button class="list-group-item list-group-item-action thread-btn" 
+                    <div class="list-group-item list-group-item-action thread-btn" 
                             data-target-id="{{ thread.id }}" 
                             data-cafe-id="{{ thread.cafe_id if current_user.role == 'vendor' else thread.id }}"
-                            data-name="{{ thread.name }}">
+                            data-name="{{ thread.name }}"
+                            style="cursor: pointer;">
                         <div class="d-flex w-100 justify-content-between">
+                            {% if current_user.role == 'customer' %}
+                            <h6 class="mb-1 fw-bold"><a href="/cafes/{{ thread.id }}" class="text-reset text-decoration-none cafe-link" style="z-index:10; position:relative;" onclick="event.stopPropagation();">{{ thread.name }}</a></h6>
+                            {% else %}
                             <h6 class="mb-1 fw-bold">{{ thread.name }}</h6>
+                            {% endif %}
                             <small class="text-muted">{{ thread.timestamp }}</small>
                         </div>
                         <p class="mb-1 text-truncate small {% if thread.unread %}fw-bold{% endif %}">{{ thread.latest_msg }}</p>
                         {% if thread.unread %}
                         <span class="badge bg-danger rounded-pill">New</span>
                         {% endif %}
-                    </button>
+                    </div>
                     {% endfor %}
                 {% else %}
                     <div class="p-4 text-center text-muted">No messages yet.</div>
@@ -181,12 +186,17 @@
         } else {
             // Create a temporary mock thread to start a new chat history securely
             const cafeName = urlParams.get('cafe_name') || "New Conversation";
-            const tempBtn = document.createElement('button');
+            const tempBtn = document.createElement('div');
             tempBtn.className = 'list-group-item list-group-item-action thread-btn bg-light border-primary';
+            tempBtn.style.cursor = 'pointer';
             tempBtn.dataset.targetId = initialCafeId;
             tempBtn.dataset.cafeId = initialCafeId;
             tempBtn.dataset.name = cafeName;
-            tempBtn.innerHTML = `<h6 class="mb-1 fw-bold">${cafeName}</h6><p class="mb-1 text-truncate small">Say hi!</p>`;
+            if (userRole === "customer") {
+                tempBtn.innerHTML = `<h6 class="mb-1 fw-bold"><a href="/cafes/${initialCafeId}" class="text-reset text-decoration-none cafe-link" style="z-index:10; position:relative;" onclick="event.stopPropagation();">${cafeName}</a></h6><p class="mb-1 text-truncate small">Say hi!</p>`;
+            } else {
+                tempBtn.innerHTML = `<h6 class="mb-1 fw-bold">${cafeName}</h6><p class="mb-1 text-truncate small">Say hi!</p>`;
+            }
             document.getElementById('thread-list').prepend(tempBtn);
             
             // Re-apply click handler for this temp button specifically, or manually invoke logic
